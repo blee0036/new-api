@@ -36,19 +36,19 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	}
 }
 
-func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
+func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", info.ApiKey))
-	req.Header.Set("Accept", "*/*")
-	req.Header.Set("User-Agent", " sd/JS 4.54.0")
-	req.Header.Set("X-Middleware-Subrequest", "app/api/chat/openai/route")
-	req.Header.Set("X-Stainless-Arch", "other:edge-runtime")
-	req.Header.Set("X-Stainless-Lang", "js")
-	req.Header.Set("X-Stainless-Os", "Unknown")
-	req.Header.Set("X-Stainless-Package-Version", "4.54.0")
-	req.Header.Set("X-Stainless-Runtime", "edge")
-	req.Header.Set("Accept-Language", "*")
-	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Set("Authorization", fmt.Sprintf("Bearer %s", info.ApiKey))
+	req.Set("Accept", "*/*")
+	req.Set("User-Agent", " sd/JS 4.54.0")
+	req.Set("X-Middleware-Subrequest", "app/api/chat/openai/route")
+	req.Set("X-Stainless-Arch", "other:edge-runtime")
+	req.Set("X-Stainless-Lang", "js")
+	req.Set("X-Stainless-Os", "Unknown")
+	req.Set("X-Stainless-Package-Version", "4.54.0")
+	req.Set("X-Stainless-Runtime", "edge")
+	req.Set("Accept-Language", "*")
+	req.Set("Sec-Fetch-Mode", "cors")
 	return nil
 }
 
@@ -56,7 +56,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, info *relaycommon.RelayInfo, re
 	return requestOpenAI2Cohere(*request), nil
 }
 
-func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (*http.Response, error) {
+func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
 	return channel.DoApiRequest(a, c, info, requestBody)
 }
 
@@ -64,7 +64,7 @@ func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dt
 	return requestConvertRerank2Cohere(request), nil
 }
 
-func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage *dto.Usage, err *dto.OpenAIErrorWithStatusCode) {
+func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *dto.OpenAIErrorWithStatusCode) {
 	if info.RelayMode == constant.RelayModeRerank {
 		err, usage = cohereRerankHandler(c, resp, info)
 	} else {
