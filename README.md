@@ -80,6 +80,13 @@
 ### 部署要求
 - 本地数据库（默认）：SQLite（Docker 部署默认使用 SQLite，必须挂载 `/data` 目录到宿主机）
 - 远程数据库：MySQL 版本 >= 5.7.8，PgSQL 版本 >= 9.6
+
+### 使用宝塔面板Docker功能部署
+安装宝塔面板 (**9.2.0版本**及以上)，前往 [宝塔面板](https://www.bt.cn/new/download.html) 官网，选择正式版的脚本下载安装  
+安装后登录宝塔面板，在菜单栏中点击 Docker ，首次进入会提示安装 Docker 服务，点击立即安装，按提示完成安装  
+安装完成后在应用商店中找到 **New-API** ，点击安装，配置基本选项 即可完成安装  
+[图文教程](BT.md)
+
 ### 基于 Docker 进行部署
 ```shell
 # 使用 SQLite 的部署命令：
@@ -87,16 +94,6 @@ docker run --name new-api -d --restart always -p 3000:3000 -e TZ=Asia/Shanghai -
 # 使用 MySQL 的部署命令，在上面的基础上添加 `-e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi"`，请自行修改数据库连接参数。
 # 例如：
 docker run --name new-api -d --restart always -p 3000:3000 -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" -e TZ=Asia/Shanghai -v /home/ubuntu/data/new-api:/data calciumion/new-api:latest
-```
-### 使用宝塔面板Docker功能部署
-```shell
-# 使用 SQLite 的部署命令：
-docker run --name new-api -d --restart always -p 3000:3000 -e TZ=Asia/Shanghai -v /www/wwwroot/new-api:/data calciumion/new-api:latest
-# 使用 MySQL 的部署命令，在上面的基础上添加 `-e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi"`，请自行修改数据库连接参数。
-# 例如：
-# 注意：数据库要开启远程访问，并且只允许服务器IP访问
-docker run --name new-api -d --restart always -p 3000:3000 -e SQL_DSN="root:123456@tcp(宝塔的服务器地址:宝塔数据库端口)/宝塔数据库名称" -e TZ=Asia/Shanghai -v /www/wwwroot/new-api:/data calciumion/new-api:latest
-# 注意：数据库要开启远程访问，并且只允许服务器IP访问
 ```
 
 ## 渠道重试
