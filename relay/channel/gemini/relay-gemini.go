@@ -108,16 +108,14 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 				},
 			}
 			continue
-		} else if message.Role == "tool" {
-			message.Role = "model"
 		}
-
 		var parts []GeminiPart
 		content := GeminiChatContent{
 			Role: message.Role,
 		}
 		isToolCall := false
 		if message.ToolCalls != nil {
+			message.Role = "model"
 			isToolCall = true
 			for _, call := range message.ParseToolCalls() {
 				toolCall := GeminiPart{
@@ -130,40 +128,55 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 			}
 		}
 		if !isToolCall {
-			openaiContent := message.ParseContent()
-			imageNum := 0
-			for _, part := range openaiContent {
-				if part.Type == dto.ContentTypeText {
-					parts = append(parts, GeminiPart{
-						Text: part.Text,
-					})
-				} else if part.Type == dto.ContentTypeImageURL {
-					imageNum += 1
+			if message.Role == "tool" {
+				content.Role = "user"
+				name := ""
+				if message.Name != nil {
+					name = *message.Name
+				}
+				functionResp := &FunctionResponse{
+					Name:     name,
+					Response: common.StrToMap(message.StringContent()),
+				}
+				parts = append(parts, GeminiPart{
+					FunctionResponse: functionResp,
+				})
+			} else {
+				openaiContent := message.ParseContent()
+				imageNum := 0
+				for _, part := range openaiContent {
+					if part.Type == dto.ContentTypeText {
+						parts = append(parts, GeminiPart{
+							Text: part.Text,
+						})
+					} else if part.Type == dto.ContentTypeImageURL {
+						imageNum += 1
 
-					if constant.GeminiVisionMaxImageNum != -1 && imageNum > constant.GeminiVisionMaxImageNum {
-						return nil, fmt.Errorf("too many images in the message, max allowed is %d", constant.GeminiVisionMaxImageNum)
-					}
-					// 判断是否是url
-					if strings.HasPrefix(part.ImageUrl.(dto.MessageImageUrl).Url, "http") {
-						// 是url，获取图片的类型和base64编码的数据
-						mimeType, data, _ := service.GetImageFromUrl(part.ImageUrl.(dto.MessageImageUrl).Url)
-						parts = append(parts, GeminiPart{
-							InlineData: &GeminiInlineData{
-								MimeType: mimeType,
-								Data:     data,
-							},
-						})
-					} else {
-						_, format, base64String, err := service.DecodeBase64ImageData(part.ImageUrl.(dto.MessageImageUrl).Url)
-						if err != nil {
-							return nil, fmt.Errorf("decode base64 image data failed: %s", err.Error())
+						if constant.GeminiVisionMaxImageNum != -1 && imageNum > constant.GeminiVisionMaxImageNum {
+							return nil, fmt.Errorf("too many images in the message, max allowed is %d", constant.GeminiVisionMaxImageNum)
 						}
-						parts = append(parts, GeminiPart{
-							InlineData: &GeminiInlineData{
-								MimeType: "image/" + format,
-								Data:     base64String,
-							},
-						})
+						// 判断是否是url
+						if strings.HasPrefix(part.ImageUrl.(dto.MessageImageUrl).Url, "http") {
+							// 是url，获取图片的类型和base64编码的数据
+							mimeType, data, _ := service.GetImageFromUrl(part.ImageUrl.(dto.MessageImageUrl).Url)
+							parts = append(parts, GeminiPart{
+								InlineData: &GeminiInlineData{
+									MimeType: mimeType,
+									Data:     data,
+								},
+							})
+						} else {
+							_, format, base64String, err := service.DecodeBase64ImageData(part.ImageUrl.(dto.MessageImageUrl).Url)
+							if err != nil {
+								return nil, fmt.Errorf("decode base64 image data failed: %s", err.Error())
+							}
+							parts = append(parts, GeminiPart{
+								InlineData: &GeminiInlineData{
+									MimeType: "image/" + format,
+									Data:     base64String,
+								},
+							})
+						}
 					}
 				}
 			}
@@ -193,7 +206,7 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 	if typeVal, exists := v["type"]; !exists || (typeVal != "object" && typeVal != "array") {
 		return schema
 	}
-
+	delete(v, "title")
 	switch v["type"] {
 	case "object":
 		delete(v, "additionalProperties")
@@ -342,6 +355,7 @@ func GeminiChatStreamHandler(c *gin.Context, resp *http.Response, info *relaycom
 		}
 		response.Id = id
 		response.Created = createAt
+		response.Model = info.UpstreamModelName
 		responseText += response.Choices[0].Delta.GetContentString()
 		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
 			usage.PromptTokens = geminiResponse.UsageMetadata.PromptTokenCount
@@ -370,7 +384,7 @@ func GeminiChatStreamHandler(c *gin.Context, resp *http.Response, info *relaycom
 	return nil, usage
 }
 
-func GeminiChatHandler(c *gin.Context, resp *http.Response) (*dto.OpenAIErrorWithStatusCode, *dto.Usage) {
+func GeminiChatHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.OpenAIErrorWithStatusCode, *dto.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return service.OpenAIErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -396,6 +410,7 @@ func GeminiChatHandler(c *gin.Context, resp *http.Response) (*dto.OpenAIErrorWit
 		}, nil
 	}
 	fullTextResponse := responseGeminiChat2OpenAI(&geminiResponse)
+	fullTextResponse.Model = info.UpstreamModelName
 	usage := dto.Usage{
 		PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
 		CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
