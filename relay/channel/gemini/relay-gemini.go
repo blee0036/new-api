@@ -296,7 +296,8 @@ func getToolCall(item *GeminiPart) *dto.ToolCall {
 		ID:   fmt.Sprintf("call_%s", common.GetUUID()),
 		Type: "function",
 		Function: dto.FunctionCall{
-			Arguments: string(argsBytes),
+			// 不好评价，得去转义一下反斜杠，Gemini 的特性好像是，Google 返回的时候本身就会转义“\”
+			Arguments: strings.ReplaceAll(string(argsBytes), "\\\\", "\\"),
 			Name:      item.FunctionCall.FunctionName,
 		},
 	}
@@ -370,7 +371,6 @@ func responseGeminiChat2OpenAI(response *GeminiChatResponse) *dto.OpenAITextResp
 				choice.Message.SetToolCalls(tool_calls)
 				is_tool_call = true
 			}
-			// 过滤掉空行
 
 			choice.Message.SetStringContent(strings.Join(texts, "\n"))
 
@@ -425,6 +425,7 @@ func streamResponseGeminiChat2OpenAI(geminiResponse *GeminiChatResponse) (*dto.C
 			if part.FunctionCall != nil {
 				isTools = true
 				if call := getToolCall(&part); call != nil {
+					call.SetIndex(len(choice.Delta.ToolCalls))
 					choice.Delta.ToolCalls = append(choice.Delta.ToolCalls, *call)
 				}
 			} else {
