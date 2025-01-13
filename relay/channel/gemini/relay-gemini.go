@@ -19,25 +19,28 @@ import (
 
 // Setting safety to the lowest possible values since Gemini is already powerless enough
 func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatRequest, error) {
-
+	threshold := common.GeminiSafetySetting
+	if strings.Contains(textRequest.Model, "exp") {
+		threshold = "OFF"
+	}
 	geminiRequest := GeminiChatRequest{
 		Contents: make([]GeminiChatContent, 0, len(textRequest.Messages)),
 		SafetySettings: []GeminiChatSafetySettings{
 			{
 				Category:  "HARM_CATEGORY_HARASSMENT",
-				Threshold: common.GeminiSafetySetting,
+				Threshold: threshold,
 			},
 			{
 				Category:  "HARM_CATEGORY_HATE_SPEECH",
-				Threshold: common.GeminiSafetySetting,
+				Threshold: threshold,
 			},
 			{
 				Category:  "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-				Threshold: common.GeminiSafetySetting,
+				Threshold: threshold,
 			},
 			{
 				Category:  "HARM_CATEGORY_DANGEROUS_CONTENT",
-				Threshold: common.GeminiSafetySetting,
+				Threshold: threshold,
 			},
 			{
 				Category:  "HARM_CATEGORY_CIVIC_INTEGRITY",
