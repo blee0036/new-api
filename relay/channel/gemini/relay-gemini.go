@@ -20,7 +20,7 @@ import (
 // Setting safety to the lowest possible values since Gemini is already powerless enough
 func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatRequest, error) {
 	threshold := common.GeminiSafetySetting
-	if strings.Contains(textRequest.Model, "exp") {
+	if strings.Contains(textRequest.Model, "exp") && textRequest.Model != "gemini-2.0-flash-thinking-exp-1219" {
 		threshold = "OFF"
 	}
 	geminiRequest := GeminiChatRequest{
