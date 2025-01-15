@@ -277,7 +277,7 @@ var ChannelBaseURLs = []string{
 	"",                                          //37
 	"https://api.jina.ai",                       //38
 	"https://api.cloudflare.com",                //39
-	"https://api.siliconflow.cn",                //40
+	"https://api-st.siliconflow.cn",             //40
 	"",                                          //41
 	"https://api.mistral.ai",                    //42
 	"https://api.deepseek.com",                  //43
