@@ -405,10 +405,7 @@ func GetCompletionRatio(name string) float64 {
 		}
 	}
 	if strings.HasPrefix(name, "deepseek") {
-		if name == "deepseek-reasoner" {
-			return 4
-		}
-		return 2
+		return 4
 	}
 	if strings.HasPrefix(name, "ERNIE-Speed-") {
 		return 2
