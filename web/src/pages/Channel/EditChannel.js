@@ -429,6 +429,7 @@ const EditChannel = (props) => {
       >
         <Spin spinning={loading}>
           <div style={{ marginTop: 10 }}>
+            
             <Typography.Text strong>{t('类型')}：</Typography.Text>
           </div>
           <Select
@@ -442,6 +443,28 @@ const EditChannel = (props) => {
             searchPosition='dropdown'
             placeholder={t('请选择渠道类型')}
           />
+          {inputs.type === 40 && (
+            <div style={{ marginTop: 10 }}>
+              <Banner
+                type="info" 
+                description={
+                  <div>
+                    <Typography.Text strong>
+                      {t('邀请链接')}: 
+                    </Typography.Text>
+                    <Typography.Text 
+                      link
+                      underline 
+                      style={{marginLeft: 8}}
+                      onClick={() => window.open('https://cloud.siliconflow.cn/i/hij0YNTZ')}
+                    >
+                      https://cloud.siliconflow.cn/i/hij0YNTZ
+                    </Typography.Text>
+                  </div>
+                }
+              />
+            </div>
+          )}
           {inputs.type === 3 && (
             <>
               <div style={{ marginTop: 10 }}>
@@ -520,12 +543,12 @@ const EditChannel = (props) => {
           {inputs.type !== 3 && inputs.type !== 8 && inputs.type !== 22 && inputs.type !== 36 && (
             <>
               <div style={{ marginTop: 10 }}>
-                <Typography.Text strong>{t('代理')}：</Typography.Text>
+                <Typography.Text strong>{t('BaseURL')}：</Typography.Text>
               </div>
               <Input
-                label={t('代理')}
+                label={t('BaseURL')}
                 name="base_url"
-                placeholder={t('此项可选，用于通过代理站来进行 API 调用')}
+                placeholder={t('此项可选，用于通过代理站来进行 API 调用，末尾不要带/v1和/')}
                 onChange={(value) => {
                   handleInputChange('base_url', value);
                 }}
