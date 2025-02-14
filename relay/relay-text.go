@@ -78,6 +78,7 @@ func TextHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 	// map model name
 	//isModelMapped := false
 	modelMapping := c.GetString("model_mapping")
+	recordModel := textRequest.Model
 	//isModelMapped := false
 	if modelMapping != "" && modelMapping != "{}" {
 		modelMap := make(map[string]string)
@@ -93,8 +94,8 @@ func TextHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 		}
 	}
 	relayInfo.UpstreamModelName = textRequest.Model
-	relayInfo.RecodeModelName = textRequest.Model
-	modelPrice, getModelPriceSuccess := common.GetModelPrice(textRequest.Model, false)
+	relayInfo.RecodeModelName = recordModel
+	modelPrice, getModelPriceSuccess := common.GetModelPrice(relayInfo.RecodeModelName, false)
 	groupRatio := setting.GetGroupRatio(relayInfo.Group)
 
 	var preConsumedQuota int
@@ -128,7 +129,7 @@ func TextHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 		if textRequest.MaxTokens != 0 {
 			preConsumedTokens = promptTokens + int(textRequest.MaxTokens)
 		}
-		modelRatio = common.GetModelRatio(textRequest.Model)
+		modelRatio = common.GetModelRatio(relayInfo.RecodeModelName)
 		ratio = modelRatio * groupRatio
 		preConsumedQuota = int(float64(preConsumedTokens) * ratio)
 	} else {

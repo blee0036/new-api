@@ -73,7 +73,23 @@ func AudioHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 		relayInfo.PromptTokens = promptTokens
 	}
 
-	modelRatio := common.GetModelRatio(audioRequest.Model)
+	// map model name
+	modelMapping := c.GetString("model_mapping")
+	recordModel := audioRequest.Model
+	if modelMapping != "" {
+		modelMap := make(map[string]string)
+		err := json.Unmarshal([]byte(modelMapping), &modelMap)
+		if err != nil {
+			return service.OpenAIErrorWrapper(err, "unmarshal_model_mapping_failed", http.StatusInternalServerError)
+		}
+		if modelMap[audioRequest.Model] != "" {
+			audioRequest.Model = modelMap[audioRequest.Model]
+		}
+	}
+	relayInfo.UpstreamModelName = audioRequest.Model
+	relayInfo.RecodeModelName = recordModel
+
+	modelRatio := common.GetModelRatio(relayInfo.RecodeModelName)
 	groupRatio := setting.GetGroupRatio(relayInfo.Group)
 	ratio := modelRatio * groupRatio
 	preConsumedQuota := int(float64(preConsumedTokens) * ratio)
@@ -90,20 +106,6 @@ func AudioHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 			returnPreConsumedQuota(c, relayInfo, userQuota, preConsumedQuota)
 		}
 	}()
-
-	// map model name
-	modelMapping := c.GetString("model_mapping")
-	if modelMapping != "" {
-		modelMap := make(map[string]string)
-		err := json.Unmarshal([]byte(modelMapping), &modelMap)
-		if err != nil {
-			return service.OpenAIErrorWrapper(err, "unmarshal_model_mapping_failed", http.StatusInternalServerError)
-		}
-		if modelMap[audioRequest.Model] != "" {
-			audioRequest.Model = modelMap[audioRequest.Model]
-		}
-	}
-	relayInfo.UpstreamModelName = audioRequest.Model
 
 	adaptor := GetAdaptor(relayInfo.ApiType)
 	if adaptor == nil {
@@ -140,7 +142,7 @@ func AudioHelper(c *gin.Context) (openaiErr *dto.OpenAIErrorWithStatusCode) {
 		return openaiErr
 	}
 
-	postConsumeQuota(c, relayInfo, audioRequest.Model, usage.(*dto.Usage), ratio, preConsumedQuota, userQuota, modelRatio, groupRatio, 0, false, "")
+	postConsumeQuota(c, relayInfo, relayInfo.RecodeModelName, usage.(*dto.Usage), ratio, preConsumedQuota, userQuota, modelRatio, groupRatio, 0, false, "")
 
 	return nil
 }
