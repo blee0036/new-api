@@ -11,17 +11,24 @@ import { useTranslation } from 'react-i18next';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
 
 const CLAUDE_HEADER = {
-  'anthropic-beta': ['output-128k-2025-02-19', 'token-efficient-tools-2025-02-19'],
+  'claude-3-7-sonnet-20250219-thinking': {
+    'anthropic-beta': ['output-128k-2025-02-19', 'token-efficient-tools-2025-02-19'],
+  }
 };
+
+const CLAUDE_DEFAULT_MAX_TOKENS = {
+  'default': 8192,
+  'claude-3-7-sonnet-20250219-thinking': 8192,
+}
 
 export default function SettingClaudeModel(props) {
   const { t } = useTranslation();
 
   const [loading, setLoading] = useState(false);
   const [inputs, setInputs] = useState({
-    'claude.headers_settings': '',
+    'claude.model_headers_settings': '',
     'claude.thinking_adapter_enabled': true,
-    'claude.thinking_adapter_max_tokens': 8192,
+    'claude.default_max_tokens': '',
     'claude.thinking_adapter_budget_tokens_percentage': 0.8,
   });
   const refForm = useRef();
@@ -82,9 +89,9 @@ export default function SettingClaudeModel(props) {
               <Col span={16}>
                 <Form.TextArea
                   label={t('Claude请求头覆盖')}
-                  field={'claude.headers_settings'}
+                  field={'claude.model_headers_settings'}
                   placeholder={t('为一个 JSON 文本，例如：') + '\n' + JSON.stringify(CLAUDE_HEADER, null, 2)}
-                  extraText={t('示例') + JSON.stringify(CLAUDE_HEADER, null, 2)}
+                  extraText={t('示例') + '\n' + JSON.stringify(CLAUDE_HEADER, null, 2)}
                   autosize={{ minRows: 6, maxRows: 12 }}
                   trigger='blur'
                   stopValidateWithError
@@ -94,18 +101,27 @@ export default function SettingClaudeModel(props) {
                       message: t('不是合法的 JSON 字符串')
                     }
                   ]}
-                  onChange={(value) => setInputs({ ...inputs, 'claude.headers_settings': value })}
+                  onChange={(value) => setInputs({ ...inputs, 'claude.model_headers_settings': value })}
                 />
               </Col>
             </Row>
             <Row>
               <Col span={8}>
-                <Form.InputNumber
+                <Form.TextArea
                   label={t('缺省 MaxTokens')}
-                  field={'claude.thinking_adapter_max_tokens'}
-                  initValue={''}
-                  extraText={t('客户端没有指定MaxTokens时的缺省值')}
-                  onChange={(value) => setInputs({ ...inputs, 'claude.thinking_adapter_max_tokens': value })}
+                  field={'claude.default_max_tokens'}
+                  placeholder={t('为一个 JSON 文本，例如：') + '\n' + JSON.stringify(CLAUDE_DEFAULT_MAX_TOKENS, null, 2)}
+                  extraText={t('示例') + '\n' + JSON.stringify(CLAUDE_DEFAULT_MAX_TOKENS, null, 2)}
+                  autosize={{ minRows: 6, maxRows: 12 }}
+                  trigger='blur'
+                  stopValidateWithError
+                  rules={[
+                    {
+                      validator: (rule, value) => verifyJSON(value),
+                      message: t('不是合法的 JSON 字符串')
+                    }
+                  ]}
+                  onChange={(value) => setInputs({ ...inputs, 'claude.default_max_tokens': value })}
                 />
               </Col>
             </Row>
