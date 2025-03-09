@@ -459,7 +459,7 @@ const LogsTable = () => {
             <>
               <Space>
                 {renderUseTime(text)}
-                {renderFirstUseTime(other.frt)}
+                {renderFirstUseTime(other?.frt)}
                 {renderIsStream(record.is_stream)}
               </Space>
             </>
@@ -837,29 +837,29 @@ const LogsTable = () => {
         let content = '';
         if (other?.ws || other?.audio) {
           content = renderAudioModelPrice(
-            other.text_input,
-            other.text_output,
-            other.model_ratio,
-            other.model_price,
-            other.completion_ratio,
-            other.audio_input,
-            other.audio_output,
+            other?.text_input,
+            other?.text_output,
+            other?.model_ratio,
+            other?.model_price,
+            other?.completion_ratio,
+            other?.audio_input,
+            other?.audio_output,
             other?.audio_ratio,
             other?.audio_completion_ratio,
-            other.group_ratio,
-            other.cache_tokens || 0,
-            other.cache_ratio || 1.0,
+            other?.group_ratio,
+            other?.cache_tokens || 0,
+            other?.cache_ratio || 1.0,
           );
         } else {
           content = renderModelPrice(
             logs[i].prompt_tokens,
             logs[i].completion_tokens,
-            other.model_ratio,
-            other.model_price,
-            other.completion_ratio,
-            other.group_ratio,
-            other.cache_tokens || 0,
-            other.cache_ratio || 1.0,
+            other?.model_ratio,
+            other?.model_price,
+            other?.completion_ratio,
+            other?.group_ratio,
+            other?.cache_tokens || 0,
+            other?.cache_ratio || 1.0,
           );
         }
         expandDataLocal.push({
@@ -958,16 +958,32 @@ const LogsTable = () => {
     <>
       {renderColumnSelector()}
       <Layout>
-        <Header style={{ backgroundColor: 'var(--semi-color-bg-1)' }}>
+        <Header>
           <Spin spinning={loadingStat}>
             <Space>
-              <Tag color='green' size='large' style={{ padding: 15 }}>
-                {t('总消耗额度')}: {renderQuota(stat.quota)}
+              <Tag color='blue' size='large' style={{ 
+                padding: 15, 
+                borderRadius: '8px', 
+                fontWeight: 500,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
+                {t('消耗额度')}: {renderQuota(stat.quota)}
               </Tag>
-              <Tag color='blue' size='large' style={{ padding: 15 }}>
+              <Tag color='pink' size='large' style={{ 
+                padding: 15, 
+                borderRadius: '8px', 
+                fontWeight: 500,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}>
                 RPM: {stat.rpm}
               </Tag>
-              <Tag color='purple' size='large' style={{ padding: 15 }}>
+              <Tag color='white' size='large' style={{ 
+                padding: 15, 
+                border: 'none', 
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', 
+                borderRadius: '8px',
+                fontWeight: 500,
+              }}>
                 TPM: {stat.tpm}
               </Tag>
             </Space>
