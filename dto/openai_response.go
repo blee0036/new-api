@@ -30,6 +30,16 @@ type OpenAITextResponse struct {
 	Usage   `json:"usage"`
 }
 
+type OpenAITextFloatResponse struct {
+	Id      string                     `json:"id"`
+	Model   string                     `json:"model"`
+	Object  string                     `json:"object"`
+	Created float64                    `json:"created"`
+	Choices []OpenAITextResponseChoice `json:"choices"`
+	Error   *OpenAIError               `json:"error,omitempty"`
+	Usage   `json:"usage"`
+}
+
 type OpenAIEmbeddingResponseItem struct {
 	Object    string    `json:"object"`
 	Index     int       `json:"index"`

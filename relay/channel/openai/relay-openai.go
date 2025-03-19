@@ -207,7 +207,18 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 	}
 	err = common.DecodeJson(responseBody, &simpleResponse)
 	if err != nil {
-		return service.OpenAIErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
+		var floatResponse dto.OpenAITextFloatResponse
+		floatErr := common.DecodeJson(responseBody, &floatResponse)
+		if floatErr != nil {
+			return service.OpenAIErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
+		}
+		simpleResponse.Id = floatResponse.Id
+		simpleResponse.Model = floatResponse.Model
+		simpleResponse.Object = floatResponse.Object
+		simpleResponse.Created = int64(floatResponse.Created * 1000) // 转换为毫秒时间戳
+		simpleResponse.Choices = floatResponse.Choices
+		simpleResponse.Error = floatResponse.Error
+		simpleResponse.Usage = floatResponse.Usage
 	}
 	if simpleResponse.Error != nil && simpleResponse.Error.Type != "" {
 		return &dto.OpenAIErrorWithStatusCode{
