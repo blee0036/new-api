@@ -314,3 +314,38 @@ func DeleteOldLog(targetTimestamp int64) (int64, error) {
 	result := LOG_DB.Where("created_at < ?", targetTimestamp).Delete(&Log{})
 	return result.RowsAffected, result.Error
 }
+
+func DeleteOldLogBySelect(targetTimestamp int64) (int64, error) {
+	const queryBatchSize = 10000
+	const deleteBatchSize = 500
+	var totalDeleted int64
+
+	for {
+		var ids []int64
+		err := LOG_DB.Select("id").
+			Where("created_at < ?", targetTimestamp).
+			Limit(queryBatchSize).
+			Find(&ids).
+			Error
+		if err != nil {
+			return totalDeleted, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+
+		for i := 0; i < len(ids); i += deleteBatchSize {
+			end := i + deleteBatchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			batch := ids[i:end]
+
+			tx := LOG_DB.Begin()
+			result := tx.Where("id IN (?)", batch).Delete(&Log{})
+			totalDeleted += result.RowsAffected
+		}
+	}
+
+	return totalDeleted, nil
+}
