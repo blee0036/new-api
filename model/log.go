@@ -323,6 +323,7 @@ func DeleteOldLogBySelect(targetTimestamp int64) (int64, error) {
 	for {
 		var ids []int64
 		err := LOG_DB.Select("id").
+			Model(&Log{}).
 			Where("created_at < ?", targetTimestamp).
 			Limit(queryBatchSize).
 			Find(&ids).
