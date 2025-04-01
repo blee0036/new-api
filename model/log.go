@@ -343,7 +343,7 @@ func DeleteOldLogBySelect(targetTimestamp int64) (int64, error) {
 			batch := ids[i:end]
 
 			tx := LOG_DB.Begin()
-			result := tx.Where("id IN (?)", batch).Delete(&Log{})
+			result := tx.Where("id IN (?)", batch).Delete(&Log{}).Commit()
 			totalDeleted += result.RowsAffected
 		}
 	}
