@@ -455,7 +455,7 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		}
 	}
 	if strings.HasPrefix(lowercaseName, "deepseek") {
-		return 4
+		return 4, true
 	}
 	if strings.HasPrefix(name, "ERNIE-Speed-") {
 		return 2, true
