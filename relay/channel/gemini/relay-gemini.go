@@ -207,6 +207,34 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 						},
 					})
 				}
+			} else if part.Type == dto.ContentTypeFile {
+				if part.GetFile().FileId != "" {
+					return nil, fmt.Errorf("only base64 file is supported in gemini")
+				}
+				format, base64String, err := service.DecodeBase64FileData(part.GetFile().FileData)
+				if err != nil {
+					return nil, fmt.Errorf("decode base64 file data failed: %s", err.Error())
+				}
+				parts = append(parts, GeminiPart{
+					InlineData: &GeminiInlineData{
+						MimeType: format,
+						Data:     base64String,
+					},
+				})
+			} else if part.Type == dto.ContentTypeInputAudio {
+				if part.GetInputAudio().Data == "" {
+					return nil, fmt.Errorf("only base64 audio is supported in gemini")
+				}
+				format, base64String, err := service.DecodeBase64FileData(part.GetInputAudio().Data)
+				if err != nil {
+					return nil, fmt.Errorf("decode base64 audio data failed: %s", err.Error())
+				}
+				parts = append(parts, GeminiPart{
+					InlineData: &GeminiInlineData{
+						MimeType: format,
+						Data:     base64String,
+					},
+				})
 			}
 		}
 
@@ -231,7 +259,6 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 
 	return &geminiRequest, nil
 }
-
 
 // cleanFunctionParameters recursively removes unsupported fields from Gemini function parameters.
 func cleanFunctionParameters(params interface{}) interface{} {
@@ -306,7 +333,6 @@ func cleanFunctionParameters(params interface{}) interface{} {
 		cleanedMap["items"] = cleanedItemsArray
 	}
 
-
 	// Recursively clean other schema composition keywords if necessary
 	for _, field := range []string{"allOf", "anyOf", "oneOf"} {
 		if nested, ok := cleanedMap[field].([]interface{}); ok {
@@ -320,7 +346,6 @@ func cleanFunctionParameters(params interface{}) interface{} {
 
 	return cleanedMap
 }
-
 
 func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interface{} {
 	if depth >= 5 {
