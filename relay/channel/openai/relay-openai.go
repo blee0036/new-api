@@ -205,7 +205,6 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 	if err != nil {
 		return service.OpenAIErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-	common.LogInfo(c, string(responseBody))
 	err = common.DecodeJson(responseBody, &simpleResponse)
 	if err != nil {
 		var floatResponse dto.OpenAITextFloatResponse
@@ -225,6 +224,16 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		return &dto.OpenAIErrorWithStatusCode{
 			Error:      *simpleResponse.Error,
 			StatusCode: resp.StatusCode,
+		}, nil
+	}
+	if simpleResponse.Error != nil && c.GetInt("channel_type") == common.ChannelTypeOpenRouter && simpleResponse.Error.Message != "" {
+		openRouteStatusCode, isInt := simpleResponse.Error.Code.(int)
+		if !isInt {
+			openRouteStatusCode = 500
+		}
+		return &dto.OpenAIErrorWithStatusCode{
+			Error:      *simpleResponse.Error,
+			StatusCode: openRouteStatusCode,
 		}, nil
 	}
 
