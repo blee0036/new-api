@@ -3,7 +3,6 @@ package helper
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"github.com/bytedance/gopkg/util/gopool"
 	"io"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"one-api/constant"
 	"one-api/dto"
 	relaycommon "one-api/relay/common"
-	"one-api/service"
 	"one-api/setting/operation_setting"
 	"strings"
 	"sync"
@@ -29,7 +27,7 @@ const (
 func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) (*dto.OpenAIErrorWithStatusCode, bool)) *dto.OpenAIErrorWithStatusCode {
 
 	if resp == nil || dataHandler == nil {
-		return service.OpenAIErrorWrapper(fmt.Errorf("invalid response"), "invalid_response", http.StatusInternalServerError)
+		return nil
 	}
 
 	defer resp.Body.Close()
