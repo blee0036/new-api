@@ -1,4 +1,4 @@
-name: Publish Docker image (multi-arch)
+name: Publish Docker image (arm64)
 
 on:
   push:
@@ -9,120 +9,35 @@ on:
       name:
         description: 'reason'
         required: false
-
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: blee0036/new_api # Renamed from IMAGE to avoid potential conflicts
+  IMAGE: blee0036/new_api
 
 jobs:
-  build_amd64:
-    name: Build AMD64 Image
+  push_to_registries:
+    name: Push Docker image to multiple registries
     runs-on: ubuntu-latest
     permissions:
+      packages: write
       contents: read
-      packages: write # Needed to push intermediate image
-    outputs:
-      image_tag: ${{ steps.push_amd64.outputs.image_tag }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
 
       - name: Save version info
         run: |
-          # Ensure VERSION file exists even if no tags (for caching consistency)
-          git describe --tags > VERSION || echo "no-tag" > VERSION
+          git describe --tags > VERSION 
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        id: buildx
 
-      # Note: Installing SQLite on the runner might not be necessary if it's only needed inside the container.
-      # If needed inside the container, it should be in your Dockerfile. Kept here as requested.
-      - name: Install SQLite3 (on Runner)
+      - name: Install SQLite3
         run: |
           sudo apt-get update
           sudo apt-get install -y sqlite3 libsqlite3-dev
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push AMD64 image
-        id: push_amd64
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true # Push arch-specific image
-          # Tag with arch and SHA for intermediate storage
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }}
-          # Output the tag for the manifest job
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }},push=true
-          # Enable build cache
-          cache-from: type=gha
-          cache-to: type=gha,mode=max # Push cache even on step failure
-
-  build_arm64:
-    name: Build ARM64 Image
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: read
-      packages: write # Needed to push intermediate image
-    outputs:
-      image_tag: ${{ steps.push_arm64.outputs.image_tag }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-
-      - name: Save version info
-        run: |
-          git describe --tags > VERSION || echo "no-tag" > VERSION
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        id: buildx
-
-      # Note: Installing SQLite on the runner might not be necessary. See comment in amd64 job.
-      - name: Install SQLite3 (on Runner)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sqlite3 libsqlite3-dev
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push ARM64 image
-        id: push_arm64
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/arm64
-          push: true # Push arch-specific image
-          # Tag with arch and SHA for intermediate storage
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }}
-          # Output the tag for the manifest job
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }},push=true
-          # Enable build cache
-          cache-from: type=gha
-          cache-to: type=gha,mode=max # Push cache even on step failure
-
-  push_manifest:
-    name: Push Multi-Arch Manifest
-    runs-on: ubuntu-latest
-    needs: [build_amd64, build_arm64] # Run after both builds complete
-    permissions:
-      contents: read # Needed for metadata action
-      packages: write # Needed to push the final manifest
-    steps:
-      - name: Check out the repo # Needed for metadata action to get tags
-        uses: actions/checkout@v4
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -135,29 +50,16 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}} # Add latest tag only for default branch pushes/tags if desired, adjust logic as needed
-            type=ref,event=tag # Use git tag as image tag
+            type=raw,value=latest
+            type=ref,event=tag
 
-      - name: Create and push multi-arch manifest
-        run: |
-          set -e # Exit on error
-          
-          amd64_image="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }}"
-          arm64_image="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }}"
-          echo "AMD64 Image: $amd64_image"
-          echo "ARM64 Image: $arm64_image"
-          echo "Final Tags: '${{ steps.meta.outputs.tags }}'"
-
-          echo "${{ steps.meta.outputs.tags }}" | sed 's/,/\\n/g' | while IFS= read -r tag; do
-            if [ -z "$tag" ]; then continue; fi # Skip empty lines
-            echo "Processing tag: $tag"
-            docker manifest create "$tag" \
-              --amend "$amd64_image" \
-              --amend "$arm64_image"
-            docker manifest push "$tag"
-          done
-        env:
-          # Pass labels if you want to try annotating them onto the manifest list
-          DOCKER_CLI_EXPERIMENTAL: enabled # Needed for manifest commands in older docker versions, usually enabled by default now
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
