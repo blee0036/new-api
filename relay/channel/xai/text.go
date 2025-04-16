@@ -42,12 +42,12 @@ func xAIStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 
 	helper.SetEventStreamHeaders(c)
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 		var xAIResp *dto.ChatCompletionsStreamResponse
 		err := json.Unmarshal([]byte(data), &xAIResp)
 		if err != nil {
 			common.SysError("error unmarshalling stream response: " + err.Error())
-			return true
+			return nil, true
 		}
 
 		// 把 xAI 的usage转换为 OpenAI 的usage
@@ -64,7 +64,7 @@ func xAIStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 		if err != nil {
 			common.SysError(err.Error())
 		}
-		return true
+		return nil, true
 	})
 
 	if !containStreamUsage {

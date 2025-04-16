@@ -3,12 +3,15 @@ package helper
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"github.com/bytedance/gopkg/util/gopool"
 	"io"
 	"net/http"
 	"one-api/common"
 	"one-api/constant"
+	"one-api/dto"
 	relaycommon "one-api/relay/common"
+	"one-api/service"
 	"one-api/setting/operation_setting"
 	"strings"
 	"sync"
@@ -23,10 +26,10 @@ const (
 	DefaultPingInterval      = 10 * time.Second
 )
 
-func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) bool) {
+func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) (*dto.OpenAIErrorWithStatusCode, bool)) *dto.OpenAIErrorWithStatusCode {
 
 	if resp == nil || dataHandler == nil {
-		return
+		return service.OpenAIErrorWrapper(fmt.Errorf("invalid response"), "invalid_response", http.StatusInternalServerError)
 	}
 
 	defer resp.Body.Close()
@@ -99,6 +102,8 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		})
 	}
 
+	var streamErr *dto.OpenAIErrorWithStatusCode = nil
+
 	common.RelayCtxGo(ctx, func() {
 		for scanner.Scan() {
 			ticker.Reset(streamingTimeout)
@@ -119,9 +124,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			if !strings.HasPrefix(data, "[DONE]") {
 				info.SetFirstResponseTime()
 				writeMutex.Lock() // Lock before writing
-				success := dataHandler(data)
+				handlerErr, success := dataHandler(data)
 				writeMutex.Unlock() // Unlock after writing
 				if !success {
+					streamErr = handlerErr
 					break
 				}
 			}
@@ -145,4 +151,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		// 正常结束
 		common.LogInfo(c, "streaming finished")
 	}
+
+	if streamErr != nil {
+		return streamErr
+	}
+
+	return nil
 }

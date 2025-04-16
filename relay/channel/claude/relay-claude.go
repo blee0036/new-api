@@ -590,12 +590,12 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 		Usage:        &dto.Usage{},
 	}
 	var err *dto.OpenAIErrorWithStatusCode
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 		err = HandleStreamResponseData(c, info, claudeInfo, data, requestMode)
 		if err != nil {
-			return false
+			return nil, false
 		}
-		return true
+		return nil, true
 	})
 	if err != nil {
 		return err, nil

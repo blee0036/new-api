@@ -214,19 +214,19 @@ func difyStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Re
 	usage := &dto.Usage{}
 	var nodeToken int
 	helper.SetEventStreamHeaders(c)
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 		var difyResponse DifyChunkChatCompletionResponse
 		err := json.Unmarshal([]byte(data), &difyResponse)
 		if err != nil {
 			common.SysError("error unmarshalling stream response: " + err.Error())
-			return true
+			return nil, true
 		}
 		var openaiResponse dto.ChatCompletionsStreamResponse
 		if difyResponse.Event == "message_end" {
 			usage = &difyResponse.MetaData.Usage
-			return false
+			return nil, false
 		} else if difyResponse.Event == "error" {
-			return false
+			return nil, false
 		} else {
 			openaiResponse = *streamResponseDify2OpenAI(difyResponse)
 			if len(openaiResponse.Choices) != 0 {
@@ -240,7 +240,7 @@ func difyStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Re
 		if err != nil {
 			common.SysError(err.Error())
 		}
-		return true
+		return nil, true
 	})
 	helper.Done(c)
 	err := resp.Body.Close()

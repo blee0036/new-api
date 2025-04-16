@@ -626,12 +626,12 @@ func GeminiChatStreamHandler(c *gin.Context, resp *http.Response, info *relaycom
 	var usage = &dto.Usage{}
 	var imageCount int
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 		var geminiResponse GeminiChatResponse
 		err := common.DecodeJsonStr(data, &geminiResponse)
 		if err != nil {
 			common.LogError(c, "error unmarshalling stream response: "+err.Error())
-			return false
+			return nil, false
 		}
 
 		response, isStop, hasImage := streamResponseGeminiChat2OpenAI(&geminiResponse)
@@ -653,7 +653,7 @@ func GeminiChatStreamHandler(c *gin.Context, resp *http.Response, info *relaycom
 			response := helper.GenerateStopResponse(id, createAt, info.UpstreamModelName, constant.FinishReasonStop)
 			helper.ObjectData(c, response)
 		}
-		return true
+		return nil, true
 	})
 
 	var response *dto.ChatCompletionsStreamResponse

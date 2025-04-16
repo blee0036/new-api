@@ -135,7 +135,24 @@ func OaiStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 		lastStreamData string
 	)
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	streamErr := helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
+		// openRouter check
+		if c.GetInt("channel_type") == common.ChannelTypeOpenRouter && lastStreamData == "" {
+			var simpleResponse dto.OpenAITextResponse
+			jsonErr := common.DecodeJsonStr(data, &simpleResponse)
+			if jsonErr == nil {
+				if simpleResponse.Error != nil && simpleResponse.Error.Message != "" {
+					openRouteStatusCode, isInt := simpleResponse.Error.Code.(int)
+					if !isInt {
+						openRouteStatusCode = 500
+					}
+					return &dto.OpenAIErrorWithStatusCode{
+						Error:      *simpleResponse.Error,
+						StatusCode: openRouteStatusCode,
+					}, false
+				}
+			}
+		}
 		if lastStreamData != "" {
 			err := handleStreamFormat(c, info, lastStreamData, forceFormat, thinkToContent)
 			if err != nil {
@@ -144,8 +161,12 @@ func OaiStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 		}
 		lastStreamData = data
 		streamItems = append(streamItems, data)
-		return true
+		return nil, true
 	})
+
+	if streamErr != nil {
+		return streamErr, nil
+	}
 
 	shouldSendLastResp := true
 	var lastStreamResponse dto.ChatCompletionsStreamResponse
