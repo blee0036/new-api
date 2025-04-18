@@ -28,9 +28,6 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest, info *relaycommon
 			TopP:            textRequest.TopP,
 			MaxOutputTokens: textRequest.MaxTokens,
 			Seed:            int64(textRequest.Seed),
-			ThinkingConfig: &GeminiThinkingConfig{
-				IncludeThoughts: true,
-			},
 		},
 	}
 
@@ -47,9 +44,14 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest, info *relaycommon
 			if budgetTokens == 0 || budgetTokens > 24576 {
 				budgetTokens = 24576
 			}
-			geminiRequest.GenerationConfig.ThinkingConfig.SetThinkingBudget(int(budgetTokens))
+			geminiRequest.GenerationConfig.ThinkingConfig = &GeminiThinkingConfig{
+				ThinkingBudget:  common.GetPointer(int(budgetTokens)),
+				IncludeThoughts: true,
+			}
 		} else if strings.HasSuffix(info.OriginModelName, "-nothinking") {
-			geminiRequest.GenerationConfig.ThinkingConfig.SetThinkingBudget(0)
+			geminiRequest.GenerationConfig.ThinkingConfig = &GeminiThinkingConfig{
+				ThinkingBudget: common.GetPointer(0),
+			}
 		}
 	}
 
@@ -300,6 +302,13 @@ func cleanFunctionParameters(params interface{}) interface{} {
 		cleanedMap[k] = v
 	}
 
+	// Remove unsupported root-level fields
+	delete(cleanedMap, "default")
+	delete(cleanedMap, "exclusiveMaximum")
+	delete(cleanedMap, "exclusiveMinimum")
+	delete(cleanedMap, "$schema")
+	delete(cleanedMap, "additionalProperties")
+
 	// Clean properties
 	if props, ok := cleanedMap["properties"].(map[string]interface{}); ok && props != nil {
 		cleanedProps := make(map[string]interface{})
@@ -320,6 +329,8 @@ func cleanFunctionParameters(params interface{}) interface{} {
 			delete(cleanedPropMap, "default")
 			delete(cleanedPropMap, "exclusiveMaximum")
 			delete(cleanedPropMap, "exclusiveMinimum")
+			delete(cleanedPropMap, "$schema")
+			delete(cleanedPropMap, "additionalProperties")
 
 			// Check and clean 'format' for string types
 			if propType, typeExists := cleanedPropMap["type"].(string); typeExists && propType == "string" {
