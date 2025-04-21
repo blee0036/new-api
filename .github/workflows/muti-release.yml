@@ -28,7 +28,7 @@ jobs:
           REACT_APP_VERSION=$(git describe --tags) npm run build
           cd ..
       - name: Upload Frontend Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: frontend
           path: web/build
@@ -87,7 +87,7 @@ jobs:
           go build -ldflags "-X 'one-api/common.Version=$(git describe --tags)'" -o "$OUTPUT"
           echo "OUTPUT_FILE=$OUTPUT" >> $GITHUB_ENV
       - name: Upload Backend Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: one-api-${{ matrix.goos }}-${{ matrix.arch }}
           path: ${{ env.OUTPUT_FILE }}
