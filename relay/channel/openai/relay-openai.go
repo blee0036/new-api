@@ -746,7 +746,7 @@ func OaiResponsesStreamHandler(c *gin.Context, resp *http.Response, info *relayc
 	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 
 		// 检查当前数据是否包含 completed 状态和 usage 信息
 		var streamResponse dto.ResponsesStreamResponse
@@ -763,7 +763,7 @@ func OaiResponsesStreamHandler(c *gin.Context, resp *http.Response, info *relayc
 
 			}
 		}
-		return true
+		return nil, true
 	})
 
 	if usage.CompletionTokens == 0 {
