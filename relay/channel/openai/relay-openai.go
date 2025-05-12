@@ -258,9 +258,34 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		}, nil
 	}
 
+	forceFormat := false
+	if forceFmt, ok := info.ChannelSetting[constant.ForceFormat].(bool); ok {
+		forceFormat = forceFmt
+	}
+
+	if simpleResponse.Usage.TotalTokens == 0 || (simpleResponse.Usage.PromptTokens == 0 && simpleResponse.Usage.CompletionTokens == 0) {
+		completionTokens := 0
+		for _, choice := range simpleResponse.Choices {
+			ctkm, _ := service.CountTextToken(choice.Message.StringContent()+choice.Message.ReasoningContent+choice.Message.Reasoning, info.UpstreamModelName)
+			completionTokens += ctkm
+		}
+		simpleResponse.Usage = dto.Usage{
+			PromptTokens:     info.PromptTokens,
+			CompletionTokens: completionTokens,
+			TotalTokens:      info.PromptTokens + completionTokens,
+		}
+	}
+
 	switch info.RelayFormat {
 	case relaycommon.RelayFormatOpenAI:
-		break
+		if forceFormat {
+			responseBody, err = json.Marshal(simpleResponse)
+			if err != nil {
+				return service.OpenAIErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+			}
+		} else {
+			break
+		}
 	case relaycommon.RelayFormatClaude:
 		claudeResp := service.ResponseOpenAI2Claude(&simpleResponse, info)
 		claudeRespStr, err := json.Marshal(claudeResp)
@@ -286,18 +311,6 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		common.SysError("error copying response body: " + err.Error())
 	}
 	resp.Body.Close()
-	if simpleResponse.Usage.TotalTokens == 0 || (simpleResponse.Usage.PromptTokens == 0 && simpleResponse.Usage.CompletionTokens == 0) {
-		completionTokens := 0
-		for _, choice := range simpleResponse.Choices {
-			ctkm, _ := service.CountTextToken(choice.Message.StringContent()+choice.Message.ReasoningContent+choice.Message.Reasoning, info.UpstreamModelName)
-			completionTokens += ctkm
-		}
-		simpleResponse.Usage = dto.Usage{
-			PromptTokens:     info.PromptTokens,
-			CompletionTokens: completionTokens,
-			TotalTokens:      info.PromptTokens + completionTokens,
-		}
-	}
 	return nil, &simpleResponse.Usage
 }
 
