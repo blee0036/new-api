@@ -151,6 +151,12 @@ func OaiStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 						StatusCode: openRouteStatusCode,
 					}, false
 				}
+				if simpleResponse.Object == "error" {
+					return &dto.OpenAIErrorWithStatusCode{
+						Error:      *simpleResponse.Error,
+						StatusCode: 400,
+					}, false
+				}
 			}
 		}
 		if lastStreamData != "" {
@@ -255,6 +261,12 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		return &dto.OpenAIErrorWithStatusCode{
 			Error:      *simpleResponse.Error,
 			StatusCode: openRouteStatusCode,
+		}, nil
+	}
+	if simpleResponse.Object == "error" && c.GetBool("check_inside_err") {
+		return &dto.OpenAIErrorWithStatusCode{
+			Error:      *simpleResponse.Error,
+			StatusCode: 400,
 		}, nil
 	}
 
