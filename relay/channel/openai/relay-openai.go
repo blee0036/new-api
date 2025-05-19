@@ -137,7 +137,7 @@ func OaiStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 
 	streamErr := helper.StreamScannerHandler(c, resp, info, func(data string) (*dto.OpenAIErrorWithStatusCode, bool) {
 		// openRouter check
-		if c.GetInt("channel_type") == common.ChannelTypeOpenRouter && lastStreamData == "" {
+		if c.GetBool("check_inside_err") && lastStreamData == "" {
 			var simpleResponse dto.OpenAITextResponse
 			jsonErr := common.DecodeJsonStr(data, &simpleResponse)
 			if jsonErr == nil {
@@ -247,7 +247,7 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
-	if simpleResponse.Error != nil && c.GetInt("channel_type") == common.ChannelTypeOpenRouter && simpleResponse.Error.Message != "" {
+	if simpleResponse.Error != nil && c.GetBool("check_inside_err") && simpleResponse.Error.Message != "" {
 		openRouteStatusCode, isInt := simpleResponse.Error.Code.(int)
 		if !isInt {
 			openRouteStatusCode = 500
