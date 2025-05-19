@@ -152,10 +152,7 @@ func OaiStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 					}, false
 				}
 				if simpleResponse.Object == "error" {
-					return &dto.OpenAIErrorWithStatusCode{
-						Error:      *simpleResponse.Error,
-						StatusCode: 400,
-					}, false
+					return service.OpenAIErrorWrapper(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError), false
 				}
 			}
 		}
@@ -264,10 +261,7 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		}, nil
 	}
 	if simpleResponse.Object == "error" && c.GetBool("check_inside_err") {
-		return &dto.OpenAIErrorWithStatusCode{
-			Error:      *simpleResponse.Error,
-			StatusCode: 400,
-		}, nil
+		return service.OpenAIErrorWrapper(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError), nil
 	}
 
 	forceFormat := false
