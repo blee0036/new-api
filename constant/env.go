@@ -38,7 +38,7 @@ func InitEnv() {
 	// GenerateDefaultToken 是否生成初始令牌，默认关闭。
 	GenerateDefaultToken = common.GetEnvOrDefaultBool("GENERATE_DEFAULT_TOKEN", false)
 	// 是否启用错误日志
-	ErrorLogEnabled = common.GetEnvOrDefaultBool("ERROR_LOG_ENABLED", false)
+	ErrorLogEnabled = common.GetEnvOrDefaultBool("ERROR_LOG_ENABLED", true)
 
 	//modelVersionMapStr := strings.TrimSpace(os.Getenv("GEMINI_MODEL_MAP"))
 	//if modelVersionMapStr == "" {
