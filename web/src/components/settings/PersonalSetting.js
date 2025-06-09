@@ -19,6 +19,7 @@ import {
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
 import { UserContext } from '../../context/User';
+import { useTheme } from '../../context/Theme';
 import {
   Avatar,
   Banner,
@@ -39,7 +40,7 @@ import {
   AutoComplete,
   Checkbox,
   Tabs,
-  TabPane,
+  TabPane
 } from '@douyinfe/semi-ui';
 import { IllustrationNoContent, IllustrationNoContentDark } from '@douyinfe/semi-illustrations';
 import {
@@ -53,7 +54,7 @@ import {
   IconKey,
   IconDelete,
   IconChevronDown,
-  IconChevronUp,
+  IconChevronUp
 } from '@douyinfe/semi-icons';
 import { SiTelegram, SiWechat, SiLinux } from 'react-icons/si';
 import { Bell, Shield, Webhook, Globe, Settings, UserPlus, ShieldCheck } from 'lucide-react';
@@ -64,6 +65,7 @@ const PersonalSetting = () => {
   const [userState, userDispatch] = useContext(UserContext);
   let navigate = useNavigate();
   const { t } = useTranslation();
+  const theme = useTheme();
 
   const [inputs, setInputs] = useState({
     wechat_verification_code: '',
@@ -384,107 +386,81 @@ const PersonalSetting = () => {
               <Card className="!rounded-2xl shadow-lg border-0">
                 {/* 顶部用户信息区域 */}
                 <Card
-                  className="!rounded-2xl !border-0 !shadow-2xl overflow-hidden"
+                  className="!rounded-2xl !border-0 !shadow-lg overflow-hidden"
                   style={{
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 25%, #a855f7 50%, #c084fc 75%, #d8b4fe 100%)',
+                    background: theme === 'dark'
+                      ? 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
+                      : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
                     position: 'relative'
                   }}
                   bodyStyle={{ padding: 0 }}
                 >
                   {/* 装饰性背景元素 */}
                   <div className="absolute inset-0 overflow-hidden">
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-                    <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white opacity-3 rounded-full"></div>
-                    <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-yellow-400 opacity-10 rounded-full"></div>
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-slate-400 dark:bg-slate-500 opacity-5 rounded-full"></div>
+                    <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-slate-300 dark:bg-slate-400 opacity-8 rounded-full"></div>
+                    <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-slate-400 dark:bg-slate-500 opacity-6 rounded-full"></div>
                   </div>
 
-                  <div className="relative p-4 sm:p-6 md:p-8" style={{ color: 'white' }}>
+                  <div className="relative p-4 sm:p-6 md:p-8 text-gray-600 dark:text-gray-300">
                     <div className="flex justify-between items-start mb-4 sm:mb-6">
                       <div className="flex items-center flex-1 min-w-0">
                         <Avatar
                           size='large'
-                          color={stringToColor(getUsername())}
-                          border={{ motion: true }}
-                          contentMotion={true}
-                          className="mr-3 sm:mr-4 shadow-lg flex-shrink-0"
+                          className="mr-3 sm:mr-4 shadow-md flex-shrink-0 bg-slate-500 dark:bg-slate-400"
                         >
                           {getAvatarText()}
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="text-base sm:text-lg font-semibold truncate" style={{ color: 'white' }}>
+                          <div className="text-base sm:text-lg font-semibold truncate text-gray-800 dark:text-gray-100">
                             {getUsername()}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-1 sm:gap-2">
                             {isRoot() ? (
                               <Tag
-                                color='red'
                                 size='small'
-                                style={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                  color: '#dc2626',
-                                  fontWeight: '600'
-                                }}
-                                className="!rounded-full"
+                                className="!rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                                style={{ fontWeight: '500' }}
                               >
                                 {t('超级管理员')}
                               </Tag>
                             ) : isAdmin() ? (
                               <Tag
-                                color='orange'
                                 size='small'
-                                style={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                  color: '#ea580c',
-                                  fontWeight: '600'
-                                }}
-                                className="!rounded-full"
+                                className="!rounded-full bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                                style={{ fontWeight: '500' }}
                               >
                                 {t('管理员')}
                               </Tag>
                             ) : (
                               <Tag
-                                color='blue'
                                 size='small'
-                                style={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                  color: '#2563eb',
-                                  fontWeight: '600'
-                                }}
-                                className="!rounded-full"
+                                className="!rounded-full bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                style={{ fontWeight: '500' }}
                               >
                                 {t('普通用户')}
                               </Tag>
                             )}
                             <Tag
-                              color='green'
                               size='small'
-                              className="!rounded-full"
-                              style={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                color: '#16a34a',
-                                fontWeight: '600'
-                              }}
+                              className="!rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                              style={{ fontWeight: '500' }}
                             >
                               ID: {userState?.user?.id}
                             </Tag>
                           </div>
                         </div>
                       </div>
-                      <div
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0 ml-2"
-                        style={{
-                          background: `linear-gradient(135deg, ${stringToColor(getUsername())} 0%, #f59e0b 100%)`
-                        }}
-                      >
-                        <IconUser size="default" style={{ color: 'white' }} />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shadow-md flex-shrink-0 ml-2 bg-slate-400 dark:bg-slate-500">
+                        <IconUser size="default" className="text-white" />
                       </div>
                     </div>
 
                     <div className="mb-4 sm:mb-6">
-                      <div className="text-xs sm:text-sm mb-1 sm:mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      <div className="text-xs sm:text-sm mb-1 sm:mb-2 text-gray-500 dark:text-gray-400">
                         {t('当前余额')}
                       </div>
-                      <div className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-wide" style={{ color: 'white' }}>
+                      <div className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-wide text-gray-900 dark:text-gray-100">
                         {renderQuota(userState?.user?.quota)}
                       </div>
                     </div>
@@ -492,33 +468,33 @@ const PersonalSetting = () => {
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end">
                       <div className="grid grid-cols-3 gap-2 sm:flex sm:space-x-6 lg:space-x-8 mb-3 sm:mb-0">
                         <div className="text-center sm:text-left">
-                          <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
                             {t('历史消耗')}
                           </div>
-                          <div className="text-xs sm:text-sm font-medium truncate" style={{ color: 'white' }}>
+                          <div className="text-xs sm:text-sm font-medium truncate text-gray-600 dark:text-gray-300">
                             {renderQuota(userState?.user?.used_quota)}
                           </div>
                         </div>
                         <div className="text-center sm:text-left">
-                          <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
                             {t('请求次数')}
                           </div>
-                          <div className="text-xs sm:text-sm font-medium truncate" style={{ color: 'white' }}>
+                          <div className="text-xs sm:text-sm font-medium truncate text-gray-600 dark:text-gray-300">
                             {userState.user?.request_count || 0}
                           </div>
                         </div>
                         <div className="text-center sm:text-left">
-                          <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
                             {t('用户分组')}
                           </div>
-                          <div className="text-xs sm:text-sm font-medium truncate" style={{ color: 'white' }}>
+                          <div className="text-xs sm:text-sm font-medium truncate text-gray-600 dark:text-gray-300">
                             {userState?.user?.group || t('默认')}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400" style={{ opacity: 0.6 }}></div>
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-500 dark:from-slate-600 dark:via-slate-500 dark:to-slate-400 opacity-40"></div>
                   </div>
                 </Card>
 
@@ -537,10 +513,10 @@ const PersonalSetting = () => {
                     >
                       <div className="gap-6 py-4">
                         {/* 可用模型部分 */}
-                        <div className="bg-gray-50 rounded-xl">
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl">
                           <div className="flex items-center mb-4">
-                            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center mr-3">
-                              <Settings size={20} className="text-purple-500" />
+                            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                              <Settings size={20} className="text-slate-600 dark:text-slate-300" />
                             </div>
                             <div>
                               <Typography.Title heading={6} className="mb-0">{t('模型列表')}</Typography.Title>
@@ -629,7 +605,7 @@ const PersonalSetting = () => {
                                 </Tabs>
                               </div>
 
-                              <div className="bg-white rounded-lg p-3">
+                              <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                                 {(() => {
                                   // 根据当前选中的分类过滤模型
                                   const categories = getModelCategories(t);
@@ -737,8 +713,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                  <IconMail size="default" className="text-red-500" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <IconMail size="default" className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('邮箱')}</div>
@@ -771,8 +747,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mr-3">
-                                  <SiWechat size={20} className="text-green-500" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <SiWechat size={20} className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('微信')}</div>
@@ -808,8 +784,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                                  <IconGithubLogo size="default" className="text-gray-700" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <IconGithubLogo size="default" className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('GitHub')}</div>
@@ -844,8 +820,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center mr-3">
-                                  <IconShield size="default" className="text-indigo-500" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <IconShield size="default" className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('OIDC')}</div>
@@ -883,8 +859,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mr-3">
-                                  <SiTelegram size={20} className="text-blue-500" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <SiTelegram size={20} className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('Telegram')}</div>
@@ -926,8 +902,8 @@ const PersonalSetting = () => {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center mr-3">
-                                  <SiLinux size={20} className="text-orange-500" />
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3">
+                                  <SiLinux size={20} className="text-slate-600 dark:text-slate-300" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="font-medium text-gray-900">{t('LinuxDO')}</div>
@@ -978,8 +954,8 @@ const PersonalSetting = () => {
                             >
                               <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
                                 <div className="flex items-start w-full sm:w-auto">
-                                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mr-4 flex-shrink-0">
-                                    <IconKey size="large" className="text-blue-500" />
+                                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                    <IconKey size="large" className="text-slate-600" />
                                   </div>
                                   <div className="flex-1">
                                     <Typography.Title heading={6} className="mb-1">
@@ -1006,7 +982,7 @@ const PersonalSetting = () => {
                                   type="primary"
                                   theme="solid"
                                   onClick={generateAccessToken}
-                                  className="!rounded-lg !bg-blue-500 hover:!bg-blue-600 w-full sm:w-auto"
+                                  className="!rounded-lg !bg-slate-600 hover:!bg-slate-700 w-full sm:w-auto"
                                   icon={<IconKey />}
                                 >
                                   {systemToken ? t('重新生成') : t('生成令牌')}
@@ -1022,8 +998,8 @@ const PersonalSetting = () => {
                             >
                               <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
                                 <div className="flex items-start w-full sm:w-auto">
-                                  <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mr-4 flex-shrink-0">
-                                    <IconLock size="large" className="text-orange-500" />
+                                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                    <IconLock size="large" className="text-slate-600" />
                                   </div>
                                   <div>
                                     <Typography.Title heading={6} className="mb-1">
@@ -1038,7 +1014,7 @@ const PersonalSetting = () => {
                                   type="primary"
                                   theme="solid"
                                   onClick={() => setShowChangePasswordModal(true)}
-                                  className="!rounded-lg !bg-orange-500 hover:!bg-orange-600 w-full sm:w-auto"
+                                  className="!rounded-lg !bg-slate-600 hover:!bg-slate-700 w-full sm:w-auto"
                                   icon={<IconLock />}
                                 >
                                   {t('修改密码')}
@@ -1054,11 +1030,11 @@ const PersonalSetting = () => {
                             >
                               <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-4">
                                 <div className="flex items-start w-full sm:w-auto">
-                                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mr-4 flex-shrink-0">
-                                    <IconDelete size="large" className="text-red-500" />
+                                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                    <IconDelete size="large" className="text-slate-600" />
                                   </div>
                                   <div>
-                                    <Typography.Title heading={6} className="mb-1 text-red-600">
+                                    <Typography.Title heading={6} className="mb-1 text-slate-700">
                                       {t('删除账户')}
                                     </Typography.Title>
                                     <Typography.Text type="tertiary" className="text-sm">
@@ -1070,7 +1046,7 @@ const PersonalSetting = () => {
                                   type="danger"
                                   theme="solid"
                                   onClick={() => setShowAccountDeleteModal(true)}
-                                  className="!rounded-lg w-full sm:w-auto"
+                                  className="!rounded-lg w-full sm:w-auto !bg-slate-500 hover:!bg-slate-600"
                                   icon={<IconDelete />}
                                 >
                                   {t('删除账户')}
@@ -1111,7 +1087,7 @@ const PersonalSetting = () => {
                                 >
                                   <Radio value='email' className="!p-4 !rounded-lg">
                                     <div className="flex items-center">
-                                      <IconMail className="mr-2 text-blue-500" />
+                                      <IconMail className="mr-2 text-slate-600" />
                                       <div>
                                         <div className="font-medium">{t('邮件通知')}</div>
                                         <div className="text-sm text-gray-500">{t('通过邮件接收通知')}</div>
@@ -1120,7 +1096,7 @@ const PersonalSetting = () => {
                                   </Radio>
                                   <Radio value='webhook' className="!p-4 !rounded-lg">
                                     <div className="flex items-center">
-                                      <Webhook size={16} className="mr-2 text-green-500" />
+                                      <Webhook size={16} className="mr-2 text-slate-600" />
                                       <div>
                                         <div className="font-medium">{t('Webhook通知')}</div>
                                         <div className="text-sm text-gray-500">{t('通过HTTP请求接收通知')}</div>
@@ -1167,11 +1143,11 @@ const PersonalSetting = () => {
                                     </div>
                                   </div>
 
-                                  <div className="bg-yellow-50 rounded-xl">
+                                  <div className="bg-slate-50 rounded-xl">
                                     <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowWebhookDocs(!showWebhookDocs)}>
                                       <div className="flex items-center">
-                                        <Globe size={16} className="mr-2 text-yellow-600" />
-                                        <Typography.Text strong className="text-yellow-800">
+                                        <Globe size={16} className="mr-2 text-slate-600" />
+                                        <Typography.Text strong className="text-slate-700">
                                           {t('Webhook请求结构')}
                                         </Typography.Text>
                                       </div>
@@ -1256,8 +1232,8 @@ const PersonalSetting = () => {
                             <div className="py-4">
                               <div className="bg-white rounded-xl">
                                 <div className="flex items-start">
-                                  <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center mt-1">
-                                    <Shield size={20} className="text-orange-500" />
+                                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mt-1">
+                                    <Shield size={20} className="text-slate-600" />
                                   </div>
                                   <div className="flex-1">
                                     <div className="flex items-center justify-between">
@@ -1292,7 +1268,7 @@ const PersonalSetting = () => {
                             type='primary'
                             onClick={saveNotificationSettings}
                             size="large"
-                            className="!rounded-lg !bg-purple-500 hover:!bg-purple-600"
+                            className="!rounded-lg !bg-slate-600 hover:!bg-slate-700"
                             icon={<IconSetting />}
                           >
                             {t('保存设置')}
@@ -1408,7 +1384,7 @@ const PersonalSetting = () => {
             theme="solid"
             size='large'
             onClick={bindWeChat}
-            className="!rounded-lg w-full !bg-green-500 hover:!bg-green-600"
+            className="!rounded-lg w-full !bg-slate-600 hover:!bg-slate-700"
             icon={<SiWechat size={16} />}
           >
             {t('绑定')}
