@@ -2,10 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Card, Spin } from '@douyinfe/semi-ui';
 import { API, showError } from '../../helpers';
 import SettingsAPIInfo from '../../pages/Setting/Dashboard/SettingsAPIInfo.js';
+import SettingsAnnouncements from '../../pages/Setting/Dashboard/SettingsAnnouncements.js';
+import SettingsFAQ from '../../pages/Setting/Dashboard/SettingsFAQ.js';
+import SettingsUptimeKuma from '../../pages/Setting/Dashboard/SettingsUptimeKuma.js';
 
 const DashboardSetting = () => {
   let [inputs, setInputs] = useState({
     ApiInfo: '',
+    Announcements: '',
+    FAQ: '',
+    UptimeKumaUrl: '',
+    UptimeKumaSlug: '',
   });
 
   let [loading, setLoading] = useState(false);
@@ -48,6 +55,21 @@ const DashboardSetting = () => {
         {/* API信息管理 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsAPIInfo options={inputs} refresh={onRefresh} />
+        </Card>
+
+        {/* 系统公告管理 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsAnnouncements options={inputs} refresh={onRefresh} />
+        </Card>
+
+        {/* 常见问答管理 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsFAQ options={inputs} refresh={onRefresh} />
+        </Card>
+
+        {/* Uptime Kuma 监控设置 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsUptimeKuma options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>

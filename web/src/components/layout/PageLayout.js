@@ -134,11 +134,10 @@ const PageLayout = () => {
           <Content
             style={{
               flex: '1 0 auto',
-              overflowY: styleState.isMobile ? 'visible' : 'auto',
+              overflowY: styleState.isMobile ? 'visible' : 'hidden',
               WebkitOverflowScrolling: 'touch',
-              padding: shouldInnerPadding ? '24px' : '0',
+              padding: shouldInnerPadding ? (styleState.isMobile ? '5px' : '24px') : '0',
               position: 'relative',
-              marginTop: styleState.isMobile ? '2px' : '0',
             }}
           >
             <App />

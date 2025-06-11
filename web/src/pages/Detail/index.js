@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { initVChartSemiTheme } from '@visactor/vchart-semi-theme';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, Activity, Zap, Gauge, PieChart } from 'lucide-react';
+import { Wallet, Activity, Zap, Gauge, PieChart, Server, Bell, HelpCircle } from 'lucide-react';
 
 import {
   Card,
@@ -13,7 +13,10 @@ import {
   Tabs,
   TabPane,
   Empty,
-  Tag
+  Tag,
+  Timeline,
+  Collapse,
+  Progress
 } from '@douyinfe/semi-ui';
 import {
   IconRefresh,
@@ -26,7 +29,9 @@ import {
   IconPulse,
   IconStopwatchStroked,
   IconTypograph,
-  IconPieChart2Stroked
+  IconPieChart2Stroked,
+  IconPlus,
+  IconMinus
 } from '@douyinfe/semi-icons';
 import { IllustrationConstruction, IllustrationConstructionDark } from '@douyinfe/semi-illustrations';
 import { VChart } from '@visactor/react-vchart';
@@ -43,7 +48,8 @@ import {
   renderQuota,
   modelToColor,
   copy,
-  showSuccess
+  showSuccess,
+  getRelativeTime
 } from '../../helpers';
 import { UserContext } from '../../context/User/index.js';
 import { StatusContext } from '../../context/Status/index.js';
@@ -179,7 +185,7 @@ const Detail = (props) => {
   const [times, setTimes] = useState(0);
   const [pieData, setPieData] = useState([{ type: 'null', value: '0' }]);
   const [lineData, setLineData] = useState([]);
-  const [apiInfoData, setApiInfoData] = useState([]);
+
   const [modelColors, setModelColors] = useState({});
   const [activeChartTab, setActiveChartTab] = useState('1');
   const [showApiScrollHint, setShowApiScrollHint] = useState(false);
@@ -195,6 +201,20 @@ const Detail = (props) => {
     rpm: [],
     tpm: []
   });
+
+  // ========== Additional Refs for new cards ==========
+  const announcementScrollRef = useRef(null);
+  const faqScrollRef = useRef(null);
+  const uptimeScrollRef = useRef(null);
+
+  // ========== Additional State for scroll hints ==========
+  const [showAnnouncementScrollHint, setShowAnnouncementScrollHint] = useState(false);
+  const [showFaqScrollHint, setShowFaqScrollHint] = useState(false);
+  const [showUptimeScrollHint, setShowUptimeScrollHint] = useState(false);
+
+  // ========== Uptime data ==========
+  const [uptimeData, setUptimeData] = useState([]);
+  const [uptimeLoading, setUptimeLoading] = useState(false);
 
   // ========== Props Destructuring ==========
   const { username, model_name, start_timestamp, end_timestamp, channel } = inputs;
@@ -543,9 +563,26 @@ const Detail = (props) => {
     }
   }, [start_timestamp, end_timestamp, username, dataExportDefaultTime, isAdminUser]);
 
+  const loadUptimeData = useCallback(async () => {
+    setUptimeLoading(true);
+    try {
+      const res = await API.get('/api/uptime/status');
+      const { success, message, data } = res.data;
+      if (success) {
+        setUptimeData(data || []);
+      } else {
+        showError(message);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUptimeLoading(false);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
-    await loadQuotaData();
-  }, [loadQuotaData]);
+    await Promise.all([loadQuotaData(), loadUptimeData()]);
+  }, [loadQuotaData, loadUptimeData]);
 
   const handleSearchConfirm = useCallback(() => {
     refresh();
@@ -554,7 +591,8 @@ const Detail = (props) => {
 
   const initChart = useCallback(async () => {
     await loadQuotaData();
-  }, [loadQuotaData]);
+    await loadUptimeData();
+  }, [loadQuotaData, loadUptimeData]);
 
   const showSearchModal = useCallback(() => {
     setSearchModalVisible(true);
@@ -577,6 +615,30 @@ const Detail = (props) => {
   const handleApiScroll = () => {
     checkApiScrollable();
   };
+
+  const checkCardScrollable = (ref, setHintFunction) => {
+    if (ref.current) {
+      const element = ref.current;
+      const isScrollable = element.scrollHeight > element.clientHeight;
+      const isAtBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 5;
+      setHintFunction(isScrollable && !isAtBottom);
+    }
+  };
+
+  const handleCardScroll = (ref, setHintFunction) => {
+    checkCardScrollable(ref, setHintFunction);
+  };
+
+  // ========== Effects for scroll detection ==========
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkApiScrollable();
+      checkCardScrollable(announcementScrollRef, setShowAnnouncementScrollHint);
+      checkCardScrollable(faqScrollRef, setShowFaqScrollHint);
+      checkCardScrollable(uptimeScrollRef, setShowUptimeScrollHint);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [uptimeData]);
 
   const getUserData = async () => {
     let res = await API.get(`/api/user/self`);
@@ -775,6 +837,54 @@ const Detail = (props) => {
     generateChartTimePoints, updateChartSpec, updateMapValue, t
   ]);
 
+  // ========== Status Data Management ==========
+  const announcementLegendData = useMemo(() => [
+    { color: 'grey', label: t('默认'), type: 'default' },
+    { color: 'blue', label: t('进行中'), type: 'ongoing' },
+    { color: 'green', label: t('成功'), type: 'success' },
+    { color: 'orange', label: t('警告'), type: 'warning' },
+    { color: 'red', label: t('异常'), type: 'error' }
+  ], [t]);
+
+  const uptimeStatusMap = useMemo(() => ({
+    1: { color: '#10b981', label: t('正常'), text: t('可用率') },   // UP
+    0: { color: '#ef4444', label: t('异常'), text: t('有异常') },   // DOWN
+    2: { color: '#f59e0b', label: t('高延迟'), text: t('高延迟') }, // PENDING
+    3: { color: '#3b82f6', label: t('维护中'), text: t('维护中') }   // MAINTENANCE
+  }), [t]);
+
+  const uptimeLegendData = useMemo(() =>
+    Object.entries(uptimeStatusMap).map(([status, info]) => ({
+      status: Number(status),
+      color: info.color,
+      label: info.label
+    })), [uptimeStatusMap]);
+
+  const getUptimeStatusColor = useCallback((status) =>
+    uptimeStatusMap[status]?.color || '#8b9aa7',
+    [uptimeStatusMap]);
+
+  const getUptimeStatusText = useCallback((status) =>
+    uptimeStatusMap[status]?.text || t('未知'),
+    [uptimeStatusMap, t]);
+
+  const apiInfoData = useMemo(() => {
+    return statusState?.status?.api_info || [];
+  }, [statusState?.status?.api_info]);
+
+  const announcementData = useMemo(() => {
+    const announcements = statusState?.status?.announcements || [];
+    // 处理后台配置的公告数据，自动生成相对时间
+    return announcements.map(item => ({
+      ...item,
+      time: getRelativeTime(item.publishDate)
+    }));
+  }, [statusState?.status?.announcements]);
+
+  const faqData = useMemo(() => {
+    return statusState?.status?.faq || [];
+  }, [statusState?.status?.faq]);
+
   // ========== Hooks - Effects ==========
   useEffect(() => {
     getUserData();
@@ -785,19 +895,6 @@ const Detail = (props) => {
       initialized.current = true;
       initChart();
     }
-  }, []);
-
-  useEffect(() => {
-    if (statusState?.status?.api_info) {
-      setApiInfoData(statusState.status.api_info);
-    }
-  }, [statusState?.status?.api_info]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      checkApiScrollable();
-    }, 100);
-    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -970,15 +1067,15 @@ const Detail = (props) => {
                 className="bg-gray-50 border-0 !rounded-2xl"
                 title={
                   <div className={FLEX_CENTER_GAP2}>
-                    <IconSearch size={16} />
+                    <Server size={16} />
                     {t('API信息')}
                   </div>
                 }
               >
-                <div className="api-info-container">
+                <div className="card-content-container">
                   <div
                     ref={apiScrollRef}
-                    className="space-y-3 max-h-96 overflow-y-auto api-info-scroll"
+                    className="space-y-3 max-h-96 overflow-y-auto card-content-scroll"
                     onScroll={handleApiScroll}
                   >
                     {apiInfoData.length > 0 ? (
@@ -1007,12 +1104,12 @@ const Detail = (props) => {
                               {api.route}
                             </div>
                             <div
-                              className="text-xs !text-semi-color-primary font-mono break-all cursor-pointer hover:underline mb-1"
+                              className="!text-semi-color-primary break-all cursor-pointer hover:underline mb-1"
                               onClick={() => handleCopyUrl(api.url)}
                             >
                               {api.url}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-gray-500">
                               {api.description}
                             </div>
                           </div>
@@ -1023,7 +1120,7 @@ const Detail = (props) => {
                         <Empty
                           image={<IllustrationConstruction style={{ width: 80, height: 80 }} />}
                           darkModeImage={<IllustrationConstructionDark style={{ width: 80, height: 80 }} />}
-                          title={t('暂无API信息配置')}
+                          title={t('暂无API信息')}
                           description={t('请联系管理员在系统设置中配置API信息')}
                           style={{ padding: '12px' }}
                         />
@@ -1031,7 +1128,7 @@ const Detail = (props) => {
                     )}
                   </div>
                   <div
-                    className="api-info-fade-indicator"
+                    className="card-content-fade-indicator"
                     style={{ opacity: showApiScrollHint ? 1 : 0 }}
                   />
                 </div>
@@ -1039,6 +1136,225 @@ const Detail = (props) => {
             )}
           </div>
         </div>
+
+        {/* 系统公告和常见问答卡片 */}
+        {!statusState?.status?.self_use_mode_enabled && (
+          <div className="mb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* 公告卡片 */}
+              <Card
+                {...CARD_PROPS}
+                className="shadow-sm !rounded-2xl lg:col-span-2"
+                title={
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 w-full">
+                    <div className="flex items-center gap-2">
+                      <Bell size={16} />
+                      {t('系统公告')}
+                      <Tag size="small" color="grey" shape="circle">
+                        {t('显示最新20条')}
+                      </Tag>
+                    </div>
+                    {/* 图例 */}
+                    <div className="flex flex-wrap gap-3 text-xs">
+                      {announcementLegendData.map((legend, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{
+                              backgroundColor: legend.color === 'grey' ? '#8b9aa7' :
+                                legend.color === 'blue' ? '#3b82f6' :
+                                  legend.color === 'green' ? '#10b981' :
+                                    legend.color === 'orange' ? '#f59e0b' :
+                                      legend.color === 'red' ? '#ef4444' : '#8b9aa7'
+                            }}
+                          />
+                          <span className="text-gray-600">{legend.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                }
+              >
+                <div className="card-content-container">
+                  <div
+                    ref={announcementScrollRef}
+                    className="p-2 max-h-96 overflow-y-auto card-content-scroll"
+                    onScroll={() => handleCardScroll(announcementScrollRef, setShowAnnouncementScrollHint)}
+                  >
+                    {announcementData.length > 0 ? (
+                      <Timeline
+                        mode="alternate"
+                        dataSource={announcementData}
+                      />
+                    ) : (
+                      <div className="flex justify-center items-center py-8">
+                        <Empty
+                          image={<IllustrationConstruction style={{ width: 80, height: 80 }} />}
+                          darkModeImage={<IllustrationConstructionDark style={{ width: 80, height: 80 }} />}
+                          title={t('暂无系统公告')}
+                          description={t('请联系管理员在系统设置中配置公告信息')}
+                          style={{ padding: '12px' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    className="card-content-fade-indicator"
+                    style={{ opacity: showAnnouncementScrollHint ? 1 : 0 }}
+                  />
+                </div>
+              </Card>
+
+              {/* 常见问答卡片 */}
+              <Card
+                {...CARD_PROPS}
+                className="shadow-sm !rounded-2xl lg:col-span-1"
+                title={
+                  <div className={FLEX_CENTER_GAP2}>
+                    <HelpCircle size={16} />
+                    {t('常见问答')}
+                  </div>
+                }
+              >
+                <div className="card-content-container">
+                  <div
+                    ref={faqScrollRef}
+                    className="p-2 max-h-96 overflow-y-auto card-content-scroll"
+                    onScroll={() => handleCardScroll(faqScrollRef, setShowFaqScrollHint)}
+                  >
+                    {faqData.length > 0 ? (
+                      <Collapse
+                        accordion
+                        expandIcon={<IconPlus />}
+                        collapseIcon={<IconMinus />}
+                      >
+                        {faqData.map((item, index) => (
+                          <Collapse.Panel
+                            key={index}
+                            header={item.title}
+                            itemKey={index.toString()}
+                          >
+                            <p>{item.content}</p>
+                          </Collapse.Panel>
+                        ))}
+                      </Collapse>
+                    ) : (
+                      <div className="flex justify-center items-center py-8">
+                        <Empty
+                          image={<IllustrationConstruction style={{ width: 80, height: 80 }} />}
+                          darkModeImage={<IllustrationConstructionDark style={{ width: 80, height: 80 }} />}
+                          title={t('暂无常见问答')}
+                          description={t('请联系管理员在系统设置中配置常见问答')}
+                          style={{ padding: '12px' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    className="card-content-fade-indicator"
+                    style={{ opacity: showFaqScrollHint ? 1 : 0 }}
+                  />
+                </div>
+              </Card>
+
+              {/* 服务可用性卡片 */}
+              <Card
+                {...CARD_PROPS}
+                className="shadow-sm !rounded-2xl lg:col-span-1"
+                title={
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <div className="flex items-center gap-2">
+                      <Gauge size={16} />
+                      {t('服务可用性')}
+                    </div>
+                    <IconButton
+                      icon={<IconRefresh />}
+                      onClick={loadUptimeData}
+                      loading={uptimeLoading}
+                      size="small"
+                      theme="borderless"
+                      className="text-gray-500 hover:text-blue-500 hover:bg-blue-50 !rounded-full"
+                    />
+                  </div>
+                }
+                footer={uptimeData.length > 0 ? (
+                  <Card
+                    shadows="always"
+                    bordered={false}
+                    className="!rounded-full backdrop-blur"
+                  >
+                    <div className="flex flex-wrap gap-3 text-xs justify-center">
+                      {uptimeLegendData.map((legend, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: legend.color }}
+                          />
+                          <span className="text-gray-600">{legend.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ) : null}
+                footerStyle={uptimeData.length > 0 ? { marginTop: '-100px' } : undefined}
+              >
+                <div className="card-content-container">
+                  <Spin spinning={uptimeLoading}>
+                    <div
+                      ref={uptimeScrollRef}
+                      className="p-2 max-h-96 overflow-y-auto card-content-scroll"
+                      onScroll={() => handleCardScroll(uptimeScrollRef, setShowUptimeScrollHint)}
+                    >
+                      {uptimeData.length > 0 ? (
+                        uptimeData.map((monitor, idx) => (
+                          <div key={idx} className="p-2 hover:bg-white rounded-lg transition-colors">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{
+                                    backgroundColor: getUptimeStatusColor(monitor.status)
+                                  }}
+                                />
+                                <span className="text-sm font-medium text-gray-900">{monitor.name}</span>
+                              </div>
+                              <span className="text-xs text-gray-500">{((monitor.uptime || 0) * 100).toFixed(2)}%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{getUptimeStatusText(monitor.status)}</span>
+                              <div className="flex-1">
+                                <Progress
+                                  percent={(monitor.uptime || 0) * 100}
+                                  showInfo={false}
+                                  aria-label={`${monitor.name} uptime`}
+                                  stroke={getUptimeStatusColor(monitor.status)}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex justify-center items-center py-8">
+                          <Empty
+                            image={<IllustrationConstruction style={{ width: 80, height: 80 }} />}
+                            darkModeImage={<IllustrationConstructionDark style={{ width: 80, height: 80 }} />}
+                            title={t('暂无监控数据')}
+                            description={t('请联系管理员在系统设置中配置Uptime')}
+                            style={{ padding: '12px' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </Spin>
+                  <div
+                    className="card-content-fade-indicator"
+                    style={{ opacity: showUptimeScrollHint ? 1 : 0 }}
+                  />
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
       </Spin>
     </div>
   );
