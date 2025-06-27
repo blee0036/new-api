@@ -45,10 +45,12 @@ import {
   IconDelete,
   IconStop,
   IconPlay,
-  IconMore
+  IconMore,
+  IconDescend
 } from '@douyinfe/semi-icons';
 import EditRedemption from '../../pages/Redemption/EditRedemption';
 import { useTranslation } from 'react-i18next';
+import { useTableCompactMode } from '../../hooks/useTableCompactMode';
 
 const { Text } = Typography;
 
@@ -266,16 +268,14 @@ const RedemptionsTable = () => {
     id: undefined,
   });
   const [showEdit, setShowEdit] = useState(false);
+  const [compactMode, setCompactMode] = useTableCompactMode('redemptions');
 
-  // Form 初始值
   const formInitValues = {
     searchKeyword: '',
   };
 
-  // Form API 引用
   const [formApi, setFormApi] = useState(null);
 
-  // 获取表单值的辅助函数
   const getFormValues = () => {
     const formValues = formApi ? formApi.getValues() : {};
     return {
@@ -296,14 +296,15 @@ const RedemptionsTable = () => {
     setRedemptions(redeptions);
   };
 
-  const loadRedemptions = async (startIdx, pageSize) => {
+  const loadRedemptions = async (page = 1, pageSize) => {
+    setLoading(true);
     const res = await API.get(
-      `/api/redemption/?p=${startIdx}&page_size=${pageSize}`,
+      `/api/redemption/?p=${page}&page_size=${pageSize}`,
     );
     const { success, message, data } = res.data;
     if (success) {
       const newPageData = data.items;
-      setActivePage(data.page);
+      setActivePage(data.page <= 0 ? 1 : data.page);
       setTokenCount(data.total);
       setRedemptionFormat(newPageData);
     } else {
@@ -336,17 +337,8 @@ const RedemptionsTable = () => {
     }
   };
 
-  const onPaginationChange = (e, { activePage }) => {
-    (async () => {
-      if (activePage === Math.ceil(redemptions.length / pageSize) + 1) {
-        await loadRedemptions(activePage - 1, pageSize);
-      }
-      setActivePage(activePage);
-    })();
-  };
-
   useEffect(() => {
-    loadRedemptions(0, pageSize)
+    loadRedemptions(1, pageSize)
       .then()
       .catch((reason) => {
         showError(reason);
@@ -417,20 +409,6 @@ const RedemptionsTable = () => {
     setSearching(false);
   };
 
-  const sortRedemption = (key) => {
-    if (redemptions.length === 0) return;
-    setLoading(true);
-    let sortedRedemptions = [...redemptions];
-    sortedRedemptions.sort((a, b) => {
-      return ('' + a[key]).localeCompare(b[key]);
-    });
-    if (sortedRedemptions[0].id === redemptions[0].id) {
-      sortedRedemptions.reverse();
-    }
-    setRedemptions(sortedRedemptions);
-    setLoading(false);
-  };
-
   const handlePageChange = (page) => {
     setActivePage(page);
     const { searchKeyword } = getFormValues();
@@ -465,9 +443,20 @@ const RedemptionsTable = () => {
   const renderHeader = () => (
     <div className="flex flex-col w-full">
       <div className="mb-2">
-        <div className="flex items-center text-orange-500">
-          <Ticket size={16} className="mr-2" />
-          <Text>{t('兑换码可以批量生成和分发，适合用于推广活动或批量充值。')}</Text>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full">
+          <div className="flex items-center text-orange-500">
+            <Ticket size={16} className="mr-2" />
+            <Text>{t('兑换码可以批量生成和分发，适合用于推广活动或批量充值。')}</Text>
+          </div>
+          <Button
+            theme='light'
+            type='secondary'
+            icon={<IconDescend />}
+            className="!rounded-full w-full md:w-auto"
+            onClick={() => setCompactMode(!compactMode)}
+          >
+            {compactMode ? t('自适应列表') : t('紧凑列表')}
+          </Button>
         </div>
       </div>
 
@@ -610,9 +599,9 @@ const RedemptionsTable = () => {
         bordered={false}
       >
         <Table
-          columns={columns}
+          columns={compactMode ? columns.map(({ fixed, ...rest }) => rest) : columns}
           dataSource={pageData}
-          scroll={{ x: 'max-content' }}
+          scroll={compactMode ? undefined : { x: 'max-content' }}
           pagination={{
             currentPage: activePage,
             pageSize: pageSize,

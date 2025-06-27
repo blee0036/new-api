@@ -25,8 +25,9 @@ import {
   ImagePreview,
   Card,
   Tag,
+  Avatar,
 } from '@douyinfe/semi-ui';
-import { getChannelModels } from '../../helpers';
+import { getChannelModels, copy } from '../../helpers';
 import {
   IconSave,
   IconClose,
@@ -64,6 +65,8 @@ function type2secretPrompt(type) {
       return '按照如下格式输入：AppId|SecretId|SecretKey';
     case 33:
       return '按照如下格式输入：Ak|Sk|Region';
+    case 50:
+      return '按照如下格式输入: AccessKey|SecretKey';
     default:
       return '请输入渠道对应的鉴权密钥';
   }
@@ -109,6 +112,10 @@ const EditChannel = (props) => {
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [isModalOpenurl, setIsModalOpenurl] = useState(false);
   const handleInputChange = (name, value) => {
+    if (name === 'models' && Array.isArray(value)) {
+      value = Array.from(new Set(value.map((m) => (m || '').trim())));
+    }
+
     if (name === 'base_url' && value.endsWith('/v1')) {
       Modal.confirm({
         title: '警告',
@@ -263,10 +270,14 @@ const EditChannel = (props) => {
   const fetchModels = async () => {
     try {
       let res = await API.get(`/api/channel/models`);
-      let localModelOptions = res.data.data.map((model) => ({
-        label: model.id,
-        value: model.id,
-      }));
+      const localModelOptions = res.data.data.map((model) => {
+        const id = (model.id || '').trim();
+        return {
+          key: id,
+          label: id,
+          value: id,
+        };
+      });
       setOriginModelOptions(localModelOptions);
       setFullModels(res.data.data.map((model) => model.id));
       setBasicModels(
@@ -298,27 +309,29 @@ const EditChannel = (props) => {
     }
   };
 
-useEffect(() => {
-  // 使用 Map 来避免重复，以 value 为键
-  const modelMap = new Map();
-  
-  // 先添加原始模型选项
-  originModelOptions.forEach(option => {
-    modelMap.set(option.value, option);
-  });
-  
-  // 再添加当前选中的模型（如果不存在）
-  inputs.models.forEach(model => {
-    if (!modelMap.has(model)) {
-      modelMap.set(model, {
-        label: model,
-        value: model,
-      });
-    }
-  });
-  
-  setModelOptions(Array.from(modelMap.values()));
-}, [originModelOptions, inputs.models]);
+  useEffect(() => {
+    const modelMap = new Map();
+
+    originModelOptions.forEach(option => {
+      const v = (option.value || '').trim();
+      if (!modelMap.has(v)) {
+        modelMap.set(v, option);
+      }
+    });
+
+    inputs.models.forEach(model => {
+      const v = (model || '').trim();
+      if (!modelMap.has(v)) {
+        modelMap.set(v, {
+          key: v,
+          label: v,
+          value: v,
+        });
+      }
+    });
+
+    setModelOptions(Array.from(modelMap.values()));
+  }, [originModelOptions, inputs.models]);
 
   useEffect(() => {
     fetchModels().then();
@@ -401,7 +414,7 @@ useEffect(() => {
         localModels.push(model);
         localModelOptions.push({
           key: model,
-          text: model,
+          label: model,
           value: model,
         });
         addedModels.push(model);
@@ -440,10 +453,7 @@ useEffect(() => {
           borderBottom: '1px solid var(--semi-color-border)',
           padding: '24px'
         }}
-        bodyStyle={{
-          backgroundColor: 'var(--semi-color-bg-0)',
-          padding: '0'
-        }}
+        bodyStyle={{ padding: '0' }}
         visible={props.visible}
         width={isMobile() ? '100%' : 600}
         footer={
@@ -451,7 +461,6 @@ useEffect(() => {
             <Space>
               <Button
                 theme="solid"
-                size="large"
                 className="!rounded-full"
                 onClick={submit}
                 icon={<IconSave />}
@@ -460,7 +469,6 @@ useEffect(() => {
               </Button>
               <Button
                 theme="light"
-                size="large"
                 className="!rounded-full"
                 type="primary"
                 onClick={handleCancel}
@@ -477,20 +485,14 @@ useEffect(() => {
         <Spin spinning={loading}>
           <div className="p-6">
             <Card className="!rounded-2xl shadow-sm border-0 mb-6">
-              <div className="flex items-center mb-4 p-6 rounded-xl" style={{
-                background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)',
-                position: 'relative'
-              }}>
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-                  <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white opacity-10 rounded-full"></div>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 relative">
-                  <IconServer size="large" style={{ color: '#ffffff' }} />
-                </div>
-                <div className="relative">
-                  <Text style={{ color: '#ffffff' }} className="text-lg font-medium">{t('基本信息')}</Text>
-                  <div style={{ color: '#ffffff' }} className="text-sm opacity-80">{t('渠道的基本配置信息')}</div>
+              {/* Header: Basic Info */}
+              <div className="flex items-center mb-2">
+                <Avatar size="small" color="blue" className="mr-2 shadow-md">
+                  <IconServer size={16} />
+                </Avatar>
+                <div>
+                  <Text className="text-lg font-medium">{t('基本信息')}</Text>
+                  <div className="text-xs text-gray-600">{t('渠道的基本配置信息')}</div>
                 </div>
               </div>
 
@@ -507,7 +509,6 @@ useEffect(() => {
                     filter
                     searchPosition='dropdown'
                     placeholder={t('请选择渠道类型')}
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -523,7 +524,6 @@ useEffect(() => {
                     }}
                     value={inputs.name}
                     autoComplete='new-password'
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -582,7 +582,6 @@ useEffect(() => {
                           }}
                           value={inputs.key}
                           autoComplete='new-password'
-                          size="large"
                           className="!rounded-lg"
                         />
                       )}
@@ -604,20 +603,14 @@ useEffect(() => {
 
             {/* API Configuration Card */}
             <Card className="!rounded-2xl shadow-sm border-0 mb-6">
-              <div className="flex items-center mb-4 p-6 rounded-xl" style={{
-                background: 'linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%)',
-                position: 'relative'
-              }}>
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-                  <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white opacity-10 rounded-full"></div>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 relative">
-                  <IconGlobe size="large" style={{ color: '#ffffff' }} />
-                </div>
-                <div className="relative">
-                  <Text style={{ color: '#ffffff' }} className="text-lg font-medium">{t('API 配置')}</Text>
-                  <div style={{ color: '#ffffff' }} className="text-sm opacity-80">{t('API 地址和相关配置')}</div>
+              {/* Header: API Config */}
+              <div className="flex items-center mb-2">
+                <Avatar size="small" color="green" className="mr-2 shadow-md">
+                  <IconGlobe size={16} />
+                </Avatar>
+                <div>
+                  <Text className="text-lg font-medium">{t('API 配置')}</Text>
+                  <div className="text-xs text-gray-600">{t('API 地址和相关配置')}</div>
                 </div>
               </div>
 
@@ -657,7 +650,6 @@ useEffect(() => {
                         onChange={(value) => handleInputChange('base_url', value)}
                         value={inputs.base_url}
                         autoComplete='new-password'
-                        size="large"
                         className="!rounded-lg"
                       />
                     </div>
@@ -669,7 +661,6 @@ useEffect(() => {
                         onChange={(value) => handleInputChange('other', value)}
                         value={inputs.other}
                         autoComplete='new-password'
-                        size="large"
                         className="!rounded-lg"
                       />
                     </div>
@@ -691,7 +682,6 @@ useEffect(() => {
                         onChange={(value) => handleInputChange('base_url', value)}
                         value={inputs.base_url}
                         autoComplete='new-password'
-                        size="large"
                         className="!rounded-lg"
                       />
                     </div>
@@ -715,7 +705,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('base_url', value)}
                       value={inputs.base_url}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                     <Text type="tertiary" className="mt-1 text-xs">
@@ -733,7 +722,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('base_url', value)}
                       value={inputs.base_url}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -750,7 +738,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('base_url', value)}
                       value={inputs.base_url}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -760,20 +747,14 @@ useEffect(() => {
 
             {/* Model Configuration Card */}
             <Card className="!rounded-2xl shadow-sm border-0 mb-6">
-              <div className="flex items-center mb-4 p-6 rounded-xl" style={{
-                background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 50%, #7c3aed 100%)',
-                position: 'relative'
-              }}>
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-                  <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white opacity-10 rounded-full"></div>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 relative">
-                  <IconCode size="large" style={{ color: '#ffffff' }} />
-                </div>
-                <div className="relative">
-                  <Text style={{ color: '#ffffff' }} className="text-lg font-medium">{t('模型配置')}</Text>
-                  <div style={{ color: '#ffffff' }} className="text-sm opacity-80">{t('模型选择和映射设置')}</div>
+              {/* Header: Model Config */}
+              <div className="flex items-center mb-2">
+                <Avatar size="small" color="purple" className="mr-2 shadow-md">
+                  <IconCode size={16} />
+                </Avatar>
+                <div>
+                  <Text className="text-lg font-medium">{t('模型配置')}</Text>
+                  <div className="text-xs text-gray-600">{t('模型选择和映射设置')}</div>
                 </div>
               </div>
 
@@ -792,7 +773,6 @@ useEffect(() => {
                     value={inputs.models}
                     autoComplete='new-password'
                     optionList={modelOptions}
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -801,7 +781,6 @@ useEffect(() => {
                   <Button
                     type='primary'
                     onClick={() => handleInputChange('models', basicModels)}
-                    size="large"
                     className="!rounded-lg"
                   >
                     {t('填入相关模型')}
@@ -809,28 +788,53 @@ useEffect(() => {
                   <Button
                     type='secondary'
                     onClick={() => handleInputChange('models', fullModels)}
-                    size="large"
                     className="!rounded-lg"
                   >
                     {t('填入所有模型')}
                   </Button>
-                  <Button
-                    type='tertiary'
-                    onClick={() => fetchUpstreamModelList('models')}
-                    size="large"
-                    className="!rounded-lg"
-                  >
-                    {t('获取模型列表')}
-                  </Button>
+                  {isEdit ? (
+                    <Button
+                      type='tertiary'
+                      onClick={() => fetchUpstreamModelList('models')}
+                      className="!rounded-lg"
+                    >
+                      {t('获取模型列表')}
+                    </Button>
+                  ) : null}
                   <Button
                     type='warning'
                     onClick={() => handleInputChange('models', [])}
-                    size="large"
                     className="!rounded-lg"
                   >
                     {t('清除所有模型')}
                   </Button>
+                  <Button
+                    type='tertiary'
+                    onClick={() => {
+                      if (inputs.models.length === 0) {
+                        showInfo(t('没有模型可以复制'));
+                        return;
+                      }
+                      try {
+                        copy(inputs.models.join(','));
+                        showSuccess(t('模型列表已复制到剪贴板'));
+                      } catch (error) {
+                        showError(t('复制失败'));
+                      }
+                    }}
+                    className="!rounded-lg"
+                  >
+                    {t('复制所有模型')}
+                  </Button>
                 </div>
+
+                {!isEdit && (
+                  <Banner
+                    type='info'
+                    description={t('创建后可在编辑渠道时获取上游模型列表')}
+                    className='!rounded-lg'
+                  />
+                )}
 
                 <div>
                   <Input
@@ -842,7 +846,6 @@ useEffect(() => {
                     placeholder={t('输入自定义模型名称')}
                     value={customModel}
                     onChange={(value) => setCustomModel(value.trim())}
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -876,7 +879,6 @@ useEffect(() => {
                     placeholder={t('不填则为模型列表第一个')}
                     onChange={(value) => handleInputChange('test_model', value)}
                     value={inputs.test_model}
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -885,20 +887,14 @@ useEffect(() => {
 
             {/* Advanced Settings Card */}
             <Card className="!rounded-2xl shadow-sm border-0 mb-6">
-              <div className="flex items-center mb-4 p-6 rounded-xl" style={{
-                background: 'linear-gradient(135deg, #92400e 0%, #d97706 50%, #f59e0b 100%)',
-                position: 'relative'
-              }}>
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-                  <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white opacity-10 rounded-full"></div>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 relative">
-                  <IconSetting size="large" style={{ color: '#ffffff' }} />
-                </div>
-                <div className="relative">
-                  <Text style={{ color: '#ffffff' }} className="text-lg font-medium">{t('高级设置')}</Text>
-                  <div style={{ color: '#ffffff' }} className="text-sm opacity-80">{t('渠道的高级配置选项')}</div>
+              {/* Header: Advanced Settings */}
+              <div className="flex items-center mb-2">
+                <Avatar size="small" color="orange" className="mr-2 shadow-md">
+                  <IconSetting size={16} />
+                </Avatar>
+                <div>
+                  <Text className="text-lg font-medium">{t('高级设置')}</Text>
+                  <div className="text-xs text-gray-600">{t('渠道的高级配置选项')}</div>
                 </div>
               </div>
 
@@ -917,7 +913,6 @@ useEffect(() => {
                     value={inputs.groups}
                     autoComplete='new-password'
                     optionList={groupOptions}
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -931,7 +926,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('other', value)}
                       value={inputs.other}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -973,7 +967,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('other', value)}
                       value={inputs.other}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -988,7 +981,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('other', value)}
                       value={inputs.other}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -1003,7 +995,6 @@ useEffect(() => {
                       onChange={(value) => handleInputChange('other', value)}
                       value={inputs.other}
                       autoComplete='new-password'
-                      size="large"
                       className="!rounded-lg"
                     />
                   </div>
@@ -1017,7 +1008,6 @@ useEffect(() => {
                     onChange={(value) => handleInputChange('tag', value)}
                     value={inputs.tag}
                     autoComplete='new-password'
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -1037,7 +1027,6 @@ useEffect(() => {
                     }}
                     value={inputs.priority}
                     autoComplete='new-password'
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -1057,7 +1046,6 @@ useEffect(() => {
                     }}
                     value={inputs.weight}
                     autoComplete='new-password'
-                    size="large"
                     className="!rounded-lg"
                   />
                 </div>
@@ -1125,7 +1113,6 @@ useEffect(() => {
                       placeholder={t('请输入组织org-xxx')}
                       onChange={(value) => handleInputChange('openai_organization', value)}
                       value={inputs.openai_organization}
-                      size="large"
                       className="!rounded-lg"
                     />
                     <Text type="tertiary" className="mt-1 text-xs">
