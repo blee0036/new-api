@@ -65,6 +65,13 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		pingTicker = time.NewTicker(pingInterval)
 	}
 
+	if common.DebugEnabled {
+		// print timeout and ping interval for debugging
+		println("relay timeout seconds:", common.RelayTimeout)
+		println("streaming timeout seconds:", int64(streamingTimeout.Seconds()))
+		println("ping interval seconds:", int64(pingInterval.Seconds()))
+	}
+
 	// 改进资源清理，确保所有 goroutine 正确退出
 	defer func() {
 		// 通知所有 goroutine 停止
