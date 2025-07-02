@@ -73,13 +73,13 @@ func processTokens(relayMode int, streamItems []string, responseTextBuilder *str
 func processChatCompletions(streamResp string, streamItems []string, responseTextBuilder *strings.Builder, toolCount *int) error {
 	var streamResponses []dto.ChatCompletionsStreamResponse
 	if err := json.Unmarshal(common.StringToByteSlice(streamResp), &streamResponses); err != nil {
-		// 一次性解析失败，逐个解析
-		common.SysError("error unmarshalling stream response: " + err.Error())
 		for _, item := range streamItems {
 			var streamResponse dto.ChatCompletionsStreamResponse
 			if err := json.Unmarshal(common.StringToByteSlice(item), &streamResponse); err != nil {
 				var floatResponse dto.ChatCompletionsStreamFloatResponse
 				if floatErr := json.Unmarshal(common.StringToByteSlice(item), &floatResponse); floatErr != nil {
+					// 一次性解析失败，逐个解析
+					common.SysError("error unmarshalling stream response: " + floatErr.Error())
 					return floatErr
 				}
 				streamResponse.Id = floatResponse.Id
@@ -89,7 +89,6 @@ func processChatCompletions(streamResp string, streamItems []string, responseTex
 				streamResponse.SystemFingerprint = floatResponse.SystemFingerprint
 				streamResponse.Choices = floatResponse.Choices
 				streamResponse.Usage = floatResponse.Usage
-				return err
 			}
 			if err := ProcessStreamResponse(streamResponse, responseTextBuilder, toolCount); err != nil {
 				common.SysError("error processing stream response: " + err.Error())
