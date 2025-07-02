@@ -126,6 +126,16 @@ type ChatCompletionsStreamResponse struct {
 	Usage             *Usage                                `json:"usage"`
 }
 
+type ChatCompletionsStreamFloatResponse struct {
+	Id                string                                `json:"id"`
+	Object            string                                `json:"object"`
+	Created           float64                               `json:"created"`
+	Model             string                                `json:"model"`
+	SystemFingerprint *string                               `json:"system_fingerprint"`
+	Choices           []ChatCompletionsStreamResponseChoice `json:"choices"`
+	Usage             *Usage                                `json:"usage"`
+}
+
 func (c *ChatCompletionsStreamResponse) IsToolCall() bool {
 	if len(c.Choices) == 0 {
 		return false
