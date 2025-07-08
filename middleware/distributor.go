@@ -254,7 +254,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if nil != channel.OpenAIOrganization && "" != *channel.OpenAIOrganization {
 		c.Set("channel_organization", *channel.OpenAIOrganization)
 	}
-	if channel.Type == common.ChannelTypeOpenRouter || strings.Contains(channel.Name, "chute") {
+	if channel.Type == constant.ChannelTypeOpenRouter || strings.Contains(channel.Name, "chute") {
 		c.Set("check_inside_err", true)
 	}
 	c.Set("auto_ban", channel.GetAutoBan())
