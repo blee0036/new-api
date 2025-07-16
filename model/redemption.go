@@ -138,11 +138,11 @@ func Redeem(key string, userId int) (quota int, err error) {
 		}
 		if redemption.MaxRedeemQuota > 0 {
 			var user User
-			err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).Select("quota").Find(&user).Error
+			err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).Select("quota", "used_quota").Find(&user).Error
 			if err != nil {
 				return err
 			}
-			if user.Quota > redemption.MaxRedeemQuota {
+			if user.Quota-user.UsedQuota > redemption.MaxRedeemQuota {
 				return errors.New(fmt.Sprintf("该兑换码只允许余额低于$%f使用", float64(redemption.MaxRedeemQuota)/common.QuotaPerUnit))
 			}
 		}
