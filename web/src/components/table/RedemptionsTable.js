@@ -115,6 +115,19 @@ const RedemptionsTable = () => {
       },
     },
     {
+      title: t('最大兑换额度'),
+      dataIndex: 'max_redeem_quota',
+      render: (text, record, index) => {
+        return (
+            <div>
+              <Tag size={'large'} color={'grey'} shape='circle'>
+                {renderQuota(parseInt(text))}
+              </Tag>
+            </div>
+        );
+      },
+    },
+    {
       title: t('创建时间'),
       dataIndex: 'created_time',
       render: (text, record, index) => {

@@ -41,6 +41,7 @@ const EditRedemption = (props) => {
   const getInitValues = () => ({
     name: '',
     quota: 100000,
+    max_redeem_quota: 0,
     count: 1,
     expired_time: null,
   });
@@ -85,6 +86,7 @@ const EditRedemption = (props) => {
     let localInputs = { ...values };
     localInputs.count = parseInt(localInputs.count) || 0;
     localInputs.quota = parseInt(localInputs.quota) || 0;
+    localInputs.max_redeem_quota = parseInt(localInputs.max_redeem_quota) || 0;
     localInputs.name = name;
     if (!localInputs.expired_time) {
       localInputs.expired_time = 0;
@@ -266,6 +268,28 @@ const EditRedemption = (props) => {
                           { value: 500000000, label: '1000$' },
                         ]}
                         showClear
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Form.AutoComplete
+                          field='max_redeem_quota'
+                          label={t('最大兑换额度')}
+                          placeholder={t('请输入额度')}
+                          style={{ width: '100%' }}
+                          type='number'
+                          rules={[
+                            { required: true, message: t('请输入额度') },
+                          ]}
+                          extraText={renderQuotaWithPrompt(Number(values.max_redeem_quota) || 0)}
+                          data={[
+                            { value: 500000, label: '1$' },
+                            { value: 5000000, label: '10$' },
+                            { value: 25000000, label: '50$' },
+                            { value: 50000000, label: '100$' },
+                            { value: 250000000, label: '500$' },
+                            { value: 500000000, label: '1000$' },
+                          ]}
+                          showClear
                       />
                     </Col>
                     {!isEdit && (

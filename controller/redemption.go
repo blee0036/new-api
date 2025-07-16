@@ -1,11 +1,11 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
 	"strconv"
-	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -135,12 +135,13 @@ func AddRedemption(c *gin.Context) {
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
 		cleanRedemption := model.Redemption{
-			UserId:      c.GetInt("id"),
-			Name:        redemption.Name,
-			Key:         key,
-			CreatedTime: common.GetTimestamp(),
-			Quota:       redemption.Quota,
-			ExpiredTime: redemption.ExpiredTime,
+			UserId:         c.GetInt("id"),
+			Name:           redemption.Name,
+			Key:            key,
+			CreatedTime:    common.GetTimestamp(),
+			Quota:          redemption.Quota,
+			ExpiredTime:    redemption.ExpiredTime,
+			MaxRedeemQuota: redemption.MaxRedeemQuota,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -238,7 +239,7 @@ func DeleteInvalidRedemption(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data": rows,
+		"data":    rows,
 	})
 	return
 }
