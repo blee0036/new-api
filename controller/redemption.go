@@ -207,6 +207,7 @@ func UpdateRedemption(c *gin.Context) {
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
+		cleanRedemption.MaxRedeemQuota = redemption.MaxRedeemQuota
 	}
 	if statusOnly != "" {
 		cleanRedemption.Status = redemption.Status
