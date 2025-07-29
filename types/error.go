@@ -105,7 +105,17 @@ func (e *NewAPIError) SetMessage(message string) {
 func (e *NewAPIError) ToOpenAIError() OpenAIError {
 	switch e.ErrorType {
 	case ErrorTypeOpenAIError:
-		return e.RelayError.(OpenAIError)
+		if openAIError, ok := e.RelayError.(OpenAIError); ok {
+			return openAIError
+		}
+		// 如果 ok 为 false，说明 RelayError 是 nil 或类型不对
+		// 此时应该返回一个通用的错误，而不是让程序崩溃
+		return OpenAIError{
+			Message: "no msg for error",
+			Type:    "no msg for error",
+			Param:   "",
+			Code:    e.errorCode,
+		}
 	case ErrorTypeClaudeError:
 		claudeError := e.RelayError.(ClaudeError)
 		return OpenAIError{
