@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"one-api/common"
 	"one-api/constant"
-	"one-api/dto"
 	relaycommon "one-api/relay/common"
 	"one-api/setting/operation_setting"
+	"one-api/types"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +26,7 @@ const (
 	DefaultPingInterval      = 10 * time.Second
 )
 
-func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) (*dto.OpenAIErrorWithStatusCode, bool)) *dto.OpenAIErrorWithStatusCode {
+func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) (*types.NewAPIError, bool)) *types.NewAPIError {
 
 	if resp == nil || dataHandler == nil {
 		return nil
@@ -170,7 +170,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		})
 	}
 
-	var streamErr *dto.OpenAIErrorWithStatusCode = nil
+	var streamErr *types.NewAPIError = nil
 	// Scanner goroutine with improved error handling
 	wg.Add(1)
 	common.RelayCtxGo(ctx, func() {
