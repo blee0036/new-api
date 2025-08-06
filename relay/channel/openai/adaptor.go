@@ -173,7 +173,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 			request.Usage = json.RawMessage(`{"include":true}`)
 		}
 	}
-	if strings.HasPrefix(request.Model, "o") {
+	if strings.HasPrefix(request.Model, "o") || strings.HasPrefix(request.Model, "gpt-oss") {
 		if request.MaxCompletionTokens == 0 && request.MaxTokens != 0 {
 			request.MaxCompletionTokens = request.MaxTokens
 			request.MaxTokens = 0
