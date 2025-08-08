@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"one-api/common"
 	"one-api/constant"
 	"one-api/dto"
 	"one-api/relay/channel"
@@ -32,6 +33,30 @@ import (
 type Adaptor struct {
 	ChannelType    int
 	ResponseFormat string
+}
+
+// parseReasoningEffortFromModelSuffix 从模型名称中解析推理级别
+// support OAI models: o1-mini/o3-mini/o4-mini/o1/o3 etc...
+// minimal effort only available in gpt-5
+func parseReasoningEffortFromModelSuffix(model string) (string, string) {
+	effortSuffixes := []string{"-high", "-minimal", "-low", "-medium"}
+	for _, suffix := range effortSuffixes {
+		if strings.HasSuffix(model, suffix) {
+			effort := strings.TrimPrefix(suffix, "-")
+			originModel := strings.TrimSuffix(model, suffix)
+			return effort, originModel
+		}
+	}
+	return "", model
+}
+
+func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
+	// 使用 service.GeminiToOpenAIRequest 转换请求格式
+	openaiRequest, err := service.GeminiToOpenAIRequest(request, info)
+	if err != nil {
+		return nil, err
+	}
+	return a.ConvertOpenAIRequest(c, info, openaiRequest)
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
@@ -64,9 +89,6 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	if info.RelayFormat == relaycommon.RelayFormatClaude {
-		return fmt.Sprintf("%s/v1/chat/completions", info.BaseUrl), nil
-	}
 	if info.RelayMode == relayconstant.RelayModeRealtime {
 		if strings.HasPrefix(info.BaseUrl, "https://") {
 			baseUrl := strings.TrimPrefix(info.BaseUrl, "https://")
@@ -113,6 +135,9 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		url = strings.Replace(url, "{model}", info.UpstreamModelName, -1)
 		return url, nil
 	default:
+		if info.RelayFormat == relaycommon.RelayFormatClaude || info.RelayFormat == relaycommon.RelayFormatGemini {
+			return fmt.Sprintf("%s/v1/chat/completions", info.BaseUrl), nil
+		}
 		return relaycommon.GetFullRequestURL(info.BaseUrl, info.RequestURLPath, info.ChannelType), nil
 	}
 }
@@ -172,41 +197,63 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		if len(request.Usage) == 0 {
 			request.Usage = json.RawMessage(`{"include":true}`)
 		}
+		if strings.HasSuffix(info.UpstreamModelName, "-thinking") {
+			info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
+			request.Model = info.UpstreamModelName
+			if len(request.Reasoning) == 0 {
+				reasoning := map[string]any{
+					"enabled": true,
+				}
+				if request.ReasoningEffort != "" {
+					reasoning["effort"] = request.ReasoningEffort
+				}
+				marshal, err := common.Marshal(reasoning)
+				if err != nil {
+					return nil, fmt.Errorf("error marshalling reasoning: %w", err)
+				}
+				request.Reasoning = marshal
+			}
+		}
 	}
-	if strings.HasPrefix(request.Model, "o") || strings.HasPrefix(request.Model, "gpt-oss") {
+
+	if strings.HasPrefix(request.Model, "o") || strings.HasPrefix(request.Model, "gpt-5") || strings.HasPrefix(request.Model, "gpt-oss") {
 		if request.MaxCompletionTokens == 0 && request.MaxTokens != 0 {
 			request.MaxCompletionTokens = request.MaxTokens
 			request.MaxTokens = 0
 		}
-		request.Temperature = nil
-		if strings.HasSuffix(request.Model, "-high") {
-			request.ReasoningEffort = "high"
-			request.Model = strings.TrimSuffix(request.Model, "-high")
-		} else if strings.HasSuffix(request.Model, "-low") {
-			request.ReasoningEffort = "low"
-			request.Model = strings.TrimSuffix(request.Model, "-low")
-		} else if strings.HasSuffix(request.Model, "-medium") {
-			request.ReasoningEffort = "medium"
-			request.Model = strings.TrimSuffix(request.Model, "-medium")
+
+		if strings.HasPrefix(request.Model, "o") {
+			request.Temperature = nil
 		}
+
+		if strings.HasPrefix(request.Model, "gpt-5") {
+			if request.Model != "gpt-5-chat-latest" {
+				request.Temperature = nil
+			}
+		}
+
+		// 转换模型推理力度后缀
+		effort, originModel := parseReasoningEffortFromModelSuffix(request.Model)
+		if effort != "" {
+			request.ReasoningEffort = effort
+			request.Model = originModel
+		}
+
 		info.ReasoningEffort = request.ReasoningEffort
 		info.UpstreamModelName = request.Model
 
-		// o系列模型developer适配（o1-mini除外）
-		if !strings.HasPrefix(request.Model, "o1-mini") && !strings.HasPrefix(request.Model, "o1-preview") {
+		if strings.HasPrefix(request.Model, "gpt-oss") {
+			//修改第一个Message的内容，将developer改为developer
+			if len(request.Messages) > 0 && request.Messages[0].Role == "developer" {
+				request.Messages[0].Role = "system"
+			}
+		} else if !strings.HasPrefix(request.Model, "o1-mini") && !strings.HasPrefix(request.Model, "o1-preview") {
+			// o系列模型developer适配（o1-mini除外）
 			//修改第一个Message的内容，将system改为developer
 			if len(request.Messages) > 0 && request.Messages[0].Role == "system" {
 				request.Messages[0].Role = "developer"
 			}
 		}
-	}
-	// 适配gpt5 取消maxToken和温度
-	if strings.Contains(request.Model, "gpt5-") {
-		if request.MaxCompletionTokens == 0 && request.MaxTokens != 0 {
-			request.MaxCompletionTokens = request.MaxTokens
-			request.MaxTokens = 0
-		}
-		request.Temperature = nil
 	}
 
 	return request, nil
@@ -413,16 +460,11 @@ func detectImageMimeType(filename string) string {
 }
 
 func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.OpenAIResponsesRequest) (any, error) {
-	// 模型后缀转换 reasoning effort
-	if strings.HasSuffix(request.Model, "-high") {
-		request.Reasoning.Effort = "high"
-		request.Model = strings.TrimSuffix(request.Model, "-high")
-	} else if strings.HasSuffix(request.Model, "-low") {
-		request.Reasoning.Effort = "low"
-		request.Model = strings.TrimSuffix(request.Model, "-low")
-	} else if strings.HasSuffix(request.Model, "-medium") {
-		request.Reasoning.Effort = "medium"
-		request.Model = strings.TrimSuffix(request.Model, "-medium")
+	//  转换模型推理力度后缀
+	effort, originModel := parseReasoningEffortFromModelSuffix(request.Model)
+	if effort != "" {
+		request.Reasoning.Effort = effort
+		request.Model = originModel
 	}
 	return request, nil
 }
