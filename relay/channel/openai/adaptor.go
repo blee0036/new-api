@@ -200,6 +200,14 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 			}
 		}
 	}
+	// 适配gpt5 取消maxToken和温度
+	if strings.Contains(request.Model, "gpt5-") {
+		if request.MaxCompletionTokens == 0 && request.MaxTokens != 0 {
+			request.MaxCompletionTokens = request.MaxTokens
+			request.MaxTokens = 0
+		}
+		request.Temperature = nil
+	}
 
 	return request, nil
 }
