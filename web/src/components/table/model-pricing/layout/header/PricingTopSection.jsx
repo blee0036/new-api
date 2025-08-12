@@ -50,6 +50,7 @@ const PricingTopSection = ({
           onCompositionEnd={handleCompositionEnd}
           onChange={handleChange}
           showClear
+          style={{ backgroundColor: 'transparent' }}
         />
       </div>
 
@@ -81,14 +82,16 @@ const PricingTopSection = ({
 
   return (
     <>
-      {/* 供应商介绍区域（含骨架屏） */}
-      <PricingVendorIntroWithSkeleton
-        loading={loading}
-        filterVendor={filterVendor}
-        models={filteredModels}
-        allModels={models}
-        t={t}
-      />
+      {/* 供应商介绍区域（桌面端显示） */}
+      {!isMobile && (
+        <PricingVendorIntroWithSkeleton
+          loading={loading}
+          filterVendor={filterVendor}
+          models={filteredModels}
+          allModels={models}
+          t={t}
+        />
+      )}
 
       {/* 搜索和操作区域 */}
       {SearchAndActions}

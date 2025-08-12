@@ -31,13 +31,14 @@ export const useModelPricingData = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [isModalOpenurl, setIsModalOpenurl] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState('default');
+  const [selectedGroup, setSelectedGroup] = useState('all');
   const [showModelDetail, setShowModelDetail] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
   const [filterGroup, setFilterGroup] = useState('all'); // 用于 Table 的可用分组筛选，"all" 表示不过滤
   const [filterQuotaType, setFilterQuotaType] = useState('all'); // 计费类型筛选: 'all' | 0 | 1
   const [filterEndpointType, setFilterEndpointType] = useState('all'); // 端点类型筛选: 'all' | string
   const [filterVendor, setFilterVendor] = useState('all'); // 供应商筛选: 'all' | 'unknown' | string
+  const [filterTag, setFilterTag] = useState('all'); // 模型标签筛选: 'all' | string
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [currency, setCurrency] = useState('USD');
@@ -49,6 +50,7 @@ export const useModelPricingData = () => {
   const [groupRatio, setGroupRatio] = useState({});
   const [usableGroup, setUsableGroup] = useState({});
   const [endpointMap, setEndpointMap] = useState({});
+  const [autoGroups, setAutoGroups] = useState([]);
 
   const [statusState] = useContext(StatusContext);
   const [userState] = useContext(UserContext);
@@ -87,6 +89,20 @@ export const useModelPricingData = () => {
       }
     }
 
+    // 标签筛选
+    if (filterTag !== 'all') {
+      const tagLower = filterTag.toLowerCase();
+      result = result.filter(model => {
+        if (!model.tags) return false;
+        const tagsArr = model.tags
+          .toLowerCase()
+          .split(/[,;|\s]+/)
+          .map(tag => tag.trim())
+          .filter(Boolean);
+        return tagsArr.includes(tagLower);
+      });
+    }
+
     // 搜索筛选
     if (searchValue.length > 0) {
       const searchTerm = searchValue.toLowerCase();
@@ -99,7 +115,7 @@ export const useModelPricingData = () => {
     }
 
     return result;
-  }, [models, searchValue, filterGroup, filterQuotaType, filterEndpointType, filterVendor]);
+  }, [models, searchValue, filterGroup, filterQuotaType, filterEndpointType, filterVendor, filterTag]);
 
   const rowSelection = useMemo(
     () => ({
@@ -160,11 +176,11 @@ export const useModelPricingData = () => {
     setLoading(true);
     let url = '/api/pricing';
     const res = await API.get(url);
-    const { success, message, data, vendors, group_ratio, usable_group, supported_endpoint } = res.data;
+    const { success, message, data, vendors, group_ratio, usable_group, supported_endpoint, auto_groups } = res.data;
     if (success) {
       setGroupRatio(group_ratio);
       setUsableGroup(usable_group);
-      setSelectedGroup(userState.user ? userState.user.group : 'default');
+      setSelectedGroup('all');
       // 构建供应商 Map 方便查找
       const vendorMap = {};
       if (Array.isArray(vendors)) {
@@ -174,6 +190,7 @@ export const useModelPricingData = () => {
       }
       setVendorsMap(vendorMap);
       setEndpointMap(supported_endpoint || {});
+      setAutoGroups(auto_groups || []);
       setModelsFormat(data, group_ratio, vendorMap);
     } else {
       showError(message);
@@ -216,12 +233,17 @@ export const useModelPricingData = () => {
     setSelectedGroup(group);
     // 同时将分组过滤设置为该分组
     setFilterGroup(group);
-    showInfo(
-      t('当前查看的分组为：{{group}}，倍率为：{{ratio}}', {
-        group: group,
-        ratio: groupRatio[group],
-      }),
-    );
+
+    if (group === 'all') {
+      showInfo(t('已切换至最优倍率视图，每个模型使用其最低倍率分组'));
+    } else {
+      showInfo(
+        t('当前查看的分组为：{{group}}，倍率为：{{ratio}}', {
+          group: group,
+          ratio: groupRatio[group] ?? 1,
+        }),
+      );
+    }
   };
 
   const openModelDetail = (model) => {
@@ -231,7 +253,9 @@ export const useModelPricingData = () => {
 
   const closeModelDetail = () => {
     setShowModelDetail(false);
-    setSelectedModel(null);
+    setTimeout(() => {
+      setSelectedModel(null);
+    }, 300);
   };
 
   useEffect(() => {
@@ -241,7 +265,7 @@ export const useModelPricingData = () => {
   // 当筛选条件变化时重置到第一页
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterGroup, filterQuotaType, filterEndpointType, filterVendor, searchValue]);
+  }, [filterGroup, filterQuotaType, filterEndpointType, filterVendor, filterTag, searchValue]);
 
   return {
     // 状态
@@ -267,6 +291,8 @@ export const useModelPricingData = () => {
     setFilterEndpointType,
     filterVendor,
     setFilterVendor,
+    filterTag,
+    setFilterTag,
     pageSize,
     setPageSize,
     currentPage,
@@ -282,6 +308,7 @@ export const useModelPricingData = () => {
     groupRatio,
     usableGroup,
     endpointMap,
+    autoGroups,
 
     // 计算属性
     priceRate,
