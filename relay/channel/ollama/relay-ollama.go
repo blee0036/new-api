@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func requestOpenAI2Ollama(request *dto.GeneralOpenAIRequest) (*OllamaRequest, error) {
+func requestOpenAI2Ollama(c *gin.Context, request *dto.GeneralOpenAIRequest) (*OllamaRequest, error) {
 	messages := make([]dto.Message, 0, len(request.Messages))
 	for _, message := range request.Messages {
 		if !message.IsStringContent() {
@@ -24,7 +24,7 @@ func requestOpenAI2Ollama(request *dto.GeneralOpenAIRequest) (*OllamaRequest, er
 					imageUrl := mediaMessage.GetImageMedia()
 					// check if not base64
 					if strings.HasPrefix(imageUrl.Url, "http") {
-						fileData, err := service.GetFileBase64FromUrl(imageUrl.Url)
+						fileData, err := service.GetFileBase64FromUrl(c, imageUrl.Url, "formatting image for Ollama")
 						if err != nil {
 							return nil, err
 						}
@@ -68,9 +68,7 @@ func requestOpenAI2Ollama(request *dto.GeneralOpenAIRequest) (*OllamaRequest, er
 		StreamOptions:    request.StreamOptions,
 		Suffix:           request.Suffix,
 	}
-	if think, ok := request.Extra["think"]; ok {
-		ollamaRequest.Think = think
-	}
+	ollamaRequest.Think = request.Think
 	return ollamaRequest, nil
 }
 
@@ -94,7 +92,7 @@ func ollamaEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
-	common.CloseResponseBodyGracefully(resp)
+	service.CloseResponseBodyGracefully(resp)
 	err = common.Unmarshal(responseBody, &ollamaEmbeddingResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -123,7 +121,7 @@ func ollamaEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
-	common.IOCopyBytesGracefully(c, resp, doResponseBody)
+	service.IOCopyBytesGracefully(c, resp, doResponseBody)
 	return usage, nil
 }
 

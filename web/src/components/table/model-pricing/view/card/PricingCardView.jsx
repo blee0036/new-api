@@ -128,19 +128,6 @@ const PricingCardView = ({
     return record.description || '';
   };
 
-  // 渲染价格信息
-  const renderPriceInfo = (record) => {
-    const priceData = calculateModelPrice({
-      record,
-      selectedGroup,
-      groupRatio,
-      tokenUnit,
-      displayPrice,
-      currency,
-    });
-    return formatPriceInfo(priceData, t);
-  };
-
   // 渲染标签
   const renderTags = (record) => {
     // 计费类型标签（左边）
@@ -215,11 +202,20 @@ const PricingCardView = ({
   }
 
   return (
-    <div className="px-4">
+    <div className="px-2">
       <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
         {paginatedModels.map((model, index) => {
           const modelKey = getModelKey(model);
           const isSelected = selectedRowKeys.includes(modelKey);
+
+          const priceData = calculateModelPrice({
+            record: model,
+            selectedGroup,
+            groupRatio,
+            tokenUnit,
+            displayPrice,
+            currency,
+          });
 
           return (
             <Card
@@ -238,7 +234,7 @@ const PricingCardView = ({
                         {model.model_name}
                       </h3>
                       <div className="flex items-center gap-3 text-xs mt-1">
-                        {renderPriceInfo(model)}
+                        {formatPriceInfo(priceData, t)}
                       </div>
                     </div>
                   </div>
@@ -247,6 +243,7 @@ const PricingCardView = ({
                     {/* 复制按钮 */}
                     <Button
                       size="small"
+                      theme="outline"
                       type="tertiary"
                       icon={<IconCopy />}
                       onClick={(e) => {
@@ -313,7 +310,7 @@ const PricingCardView = ({
                           {t('补全')}: {model.quota_type === 0 ? parseFloat(model.completion_ratio.toFixed(3)) : t('无')}
                         </div>
                         <div>
-                          {t('分组')}: {priceData.usedGroupRatio}
+                          {t('分组')}: {priceData?.usedGroupRatio ?? '-'}
                         </div>
                       </div>
                     </div>

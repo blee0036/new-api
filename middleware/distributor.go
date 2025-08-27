@@ -107,11 +107,11 @@ func Distribute() func(c *gin.Context) {
 					//	common.SysError(fmt.Sprintf("渠道不存在：%d", channel.Id))
 					//	message = "数据库一致性已被破坏，请联系管理员"
 					//}
-					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message)
+					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message, string(types.ErrorCodeModelNotFound))
 					return
 				}
 				if channel == nil {
-					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, fmt.Sprintf("分组 %s 下模型 %s 无可用渠道（distributor）", userGroup, modelRequest.Model))
+					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, fmt.Sprintf("分组 %s 下模型 %s 无可用渠道（distributor）", userGroup, modelRequest.Model), string(types.ErrorCodeModelNotFound))
 					return
 				}
 			}
@@ -174,7 +174,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			relayMode = relayconstant.RelayModeVideoFetchByID
 			shouldSelectChannel = false
 		}
-		c.Set("relay_mode", relayMode)
+		if _, ok := c.Get("relay_mode"); !ok {
+			c.Set("relay_mode", relayMode)
+		}
 	} else if strings.HasPrefix(c.Request.URL.Path, "/v1beta/models/") || strings.HasPrefix(c.Request.URL.Path, "/v1/models/") {
 		// Gemini API 路径处理: /v1beta/models/gemini-2.0-flash:generateContent
 		relayMode := relayconstant.RelayModeGemini
@@ -183,7 +185,7 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			modelRequest.Model = modelName
 		}
 		c.Set("relay_mode", relayMode)
-	} else if !strings.HasPrefix(c.Request.URL.Path, "/v1/audio/transcriptions") && !strings.HasPrefix(c.Request.URL.Path, "/v1/images/edits") {
+	} else if !strings.HasPrefix(c.Request.URL.Path, "/v1/audio/transcriptions") && !strings.Contains(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
 		err = common.UnmarshalBodyReusable(c, &modelRequest)
 	}
 	if err != nil {
@@ -206,7 +208,10 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/images/generations") {
 		modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "dall-e")
 	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/images/edits") {
-		modelRequest.Model = common.GetStringIfEmpty(c.PostForm("model"), "gpt-image-1")
+		//modelRequest.Model = common.GetStringIfEmpty(c.PostForm("model"), "gpt-image-1")
+		if strings.Contains(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
+			modelRequest.Model = c.PostForm("model")
+		}
 	}
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/audio") {
 		relayMode := relayconstant.RelayModeAudioSpeech
@@ -246,6 +251,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	common.SetContextKey(c, constant.ContextKeyChannelSetting, channel.GetSetting())
 	common.SetContextKey(c, constant.ContextKeyChannelOtherSetting, channel.GetOtherSettings())
 	common.SetContextKey(c, constant.ContextKeyChannelParamOverride, channel.GetParamOverride())
+	common.SetContextKey(c, constant.ContextKeyChannelHeaderOverride, channel.GetHeaderOverride())
 	if nil != channel.OpenAIOrganization && *channel.OpenAIOrganization != "" {
 		common.SetContextKey(c, constant.ContextKeyChannelOrganization, *channel.OpenAIOrganization)
 	}

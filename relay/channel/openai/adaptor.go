@@ -105,14 +105,14 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	if info.RelayMode == relayconstant.RelayModeRealtime {
-		if strings.HasPrefix(info.BaseUrl, "https://") {
-			baseUrl := strings.TrimPrefix(info.BaseUrl, "https://")
+		if strings.HasPrefix(info.ChannelBaseUrl, "https://") {
+			baseUrl := strings.TrimPrefix(info.ChannelBaseUrl, "https://")
 			baseUrl = "wss://" + baseUrl
-			info.BaseUrl = baseUrl
-		} else if strings.HasPrefix(info.BaseUrl, "http://") {
-			baseUrl := strings.TrimPrefix(info.BaseUrl, "http://")
+			info.ChannelBaseUrl = baseUrl
+		} else if strings.HasPrefix(info.ChannelBaseUrl, "http://") {
+			baseUrl := strings.TrimPrefix(info.ChannelBaseUrl, "http://")
 			baseUrl = "ws://" + baseUrl
-			info.BaseUrl = baseUrl
+			info.ChannelBaseUrl = baseUrl
 		}
 	}
 	switch info.ChannelType {
@@ -126,7 +126,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, apiVersion)
 		task := strings.TrimPrefix(requestURL, "/v1/")
 
-		if info.RelayFormat == relaycommon.RelayFormatClaude {
+		if info.RelayFormat == types.RelayFormatClaude {
 			task = strings.TrimPrefix(task, "messages")
 			task = "chat/completions" + task
 		}
@@ -136,7 +136,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			responsesApiVersion := "preview"
 
 			subUrl := "/openai/v1/responses"
-			if strings.Contains(info.BaseUrl, "cognitiveservices.azure.com") {
+			if strings.Contains(info.ChannelBaseUrl, "cognitiveservices.azure.com") {
 				subUrl = "/openai/responses"
 				responsesApiVersion = apiVersion
 			}
@@ -146,7 +146,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			}
 
 			requestURL = fmt.Sprintf("%s?api-version=%s", subUrl, responsesApiVersion)
-			return relaycommon.GetFullRequestURL(info.BaseUrl, requestURL, info.ChannelType), nil
+			return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
 		}
 
 		model_ := info.UpstreamModelName
@@ -159,18 +159,18 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		if info.RelayMode == relayconstant.RelayModeRealtime {
 			requestURL = fmt.Sprintf("/openai/realtime?deployment=%s&api-version=%s", model_, apiVersion)
 		}
-		return relaycommon.GetFullRequestURL(info.BaseUrl, requestURL, info.ChannelType), nil
+		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
 	case constant.ChannelTypeMiniMax:
 		return minimax.GetRequestURL(info)
 	case constant.ChannelTypeCustom:
-		url := info.BaseUrl
+		url := info.ChannelBaseUrl
 		url = strings.Replace(url, "{model}", info.UpstreamModelName, -1)
 		return url, nil
 	default:
-		if info.RelayFormat == relaycommon.RelayFormatClaude || info.RelayFormat == relaycommon.RelayFormatGemini {
-			return fmt.Sprintf("%s/v1/chat/completions", info.BaseUrl), nil
+		if info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini {
+			return fmt.Sprintf("%s/v1/chat/completions", info.ChannelBaseUrl), nil
 		}
-		return relaycommon.GetFullRequestURL(info.BaseUrl, info.RequestURLPath, info.ChannelType), nil
+		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, info.RequestURLPath, info.ChannelType), nil
 	}
 }
 
@@ -246,6 +246,8 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 				}
 				request.Reasoning = marshal
 			}
+			// 清空多余的ReasoningEffort
+			request.ReasoningEffort = ""
 		} else {
 			if len(request.Reasoning) == 0 {
 				// 适配 OpenAI 的 ReasoningEffort 格式
@@ -263,7 +265,40 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 					}
 				}
 			}
+			request.ReasoningEffort = ""
 		}
+
+		// https://docs.anthropic.com/en/api/openai-sdk#extended-thinking-support
+		// 没有做排除3.5Haiku等，要出问题再加吧，最佳兼容性（不是
+		if request.THINKING != nil && strings.HasPrefix(info.UpstreamModelName, "anthropic") {
+			var thinking dto.Thinking // Claude标准Thinking格式
+			if err := json.Unmarshal(request.THINKING, &thinking); err != nil {
+				return nil, fmt.Errorf("error Unmarshal thinking: %w", err)
+			}
+
+			// 只有当 thinking.Type 是 "enabled" 时才处理
+			if thinking.Type == "enabled" {
+				// 检查 BudgetTokens 是否为 nil
+				if thinking.BudgetTokens == nil {
+					return nil, fmt.Errorf("BudgetTokens is nil when thinking is enabled")
+				}
+
+				reasoning := openrouter.RequestReasoning{
+					MaxTokens: *thinking.BudgetTokens,
+				}
+
+				marshal, err := common.Marshal(reasoning)
+				if err != nil {
+					return nil, fmt.Errorf("error marshalling reasoning: %w", err)
+				}
+
+				request.Reasoning = marshal
+			}
+
+			// 清空 THINKING
+			request.THINKING = nil
+		}
+
 	}
 
 	if strings.HasPrefix(info.UpstreamModelName, "o") || strings.HasPrefix(info.UpstreamModelName, "gpt-5") || strings.HasPrefix(info.UpstreamModelName, "gpt-oss") {
@@ -374,40 +409,42 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		writer := multipart.NewWriter(&requestBody)
 
 		writer.WriteField("model", request.Model)
-		// 获取所有表单字段
-		formData := c.Request.PostForm
-		// 遍历表单字段并打印输出
-		for key, values := range formData {
-			if key == "model" {
-				continue
+		// 使用已解析的 multipart 表单，避免重复解析
+		mf := c.Request.MultipartForm
+		if mf == nil {
+			if _, err := c.MultipartForm(); err != nil {
+				return nil, errors.New("failed to parse multipart form")
 			}
-			for _, value := range values {
-				writer.WriteField(key, value)
+			mf = c.Request.MultipartForm
+		}
+
+		// 写入所有非文件字段
+		if mf != nil {
+			for key, values := range mf.Value {
+				if key == "model" {
+					continue
+				}
+				for _, value := range values {
+					writer.WriteField(key, value)
+				}
 			}
 		}
 
-		// Parse the multipart form to handle both single image and multiple images
-		if err := c.Request.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
-			return nil, errors.New("failed to parse multipart form")
-		}
-
-		if c.Request.MultipartForm != nil && c.Request.MultipartForm.File != nil {
+		if mf != nil && mf.File != nil {
 			// Check if "image" field exists in any form, including array notation
 			var imageFiles []*multipart.FileHeader
 			var exists bool
 
 			// First check for standard "image" field
-			if imageFiles, exists = c.Request.MultipartForm.File["image"]; !exists || len(imageFiles) == 0 {
+			if imageFiles, exists = mf.File["image"]; !exists || len(imageFiles) == 0 {
 				// If not found, check for "image[]" field
-				if imageFiles, exists = c.Request.MultipartForm.File["image[]"]; !exists || len(imageFiles) == 0 {
+				if imageFiles, exists = mf.File["image[]"]; !exists || len(imageFiles) == 0 {
 					// If still not found, iterate through all fields to find any that start with "image["
 					foundArrayImages := false
-					for fieldName, files := range c.Request.MultipartForm.File {
+					for fieldName, files := range mf.File {
 						if strings.HasPrefix(fieldName, "image[") && len(files) > 0 {
 							foundArrayImages = true
-							for _, file := range files {
-								imageFiles = append(imageFiles, file)
-							}
+							imageFiles = append(imageFiles, files...)
 						}
 					}
 
@@ -424,7 +461,6 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 				if err != nil {
 					return nil, fmt.Errorf("failed to open image file %d: %w", i, err)
 				}
-				defer file.Close()
 
 				// If multiple images, use image[] as the field name
 				fieldName := "image"
@@ -448,15 +484,18 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 				if _, err := io.Copy(part, file); err != nil {
 					return nil, fmt.Errorf("copy file failed for image %d: %w", i, err)
 				}
+
+				// 复制完立即关闭，避免在循环内使用 defer 占用资源
+				_ = file.Close()
 			}
 
 			// Handle mask file if present
-			if maskFiles, exists := c.Request.MultipartForm.File["mask"]; exists && len(maskFiles) > 0 {
+			if maskFiles, exists := mf.File["mask"]; exists && len(maskFiles) > 0 {
 				maskFile, err := maskFiles[0].Open()
 				if err != nil {
 					return nil, errors.New("failed to open mask file")
 				}
-				defer maskFile.Close()
+				// 复制完立即关闭，避免在循环内使用 defer 占用资源
 
 				// Determine MIME type for mask file
 				mimeType := detectImageMimeType(maskFiles[0].Filename)
@@ -474,6 +513,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 				if _, err := io.Copy(maskPart, maskFile); err != nil {
 					return nil, errors.New("copy mask file failed")
 				}
+				_ = maskFile.Close()
 			}
 		} else {
 			return nil, errors.New("no multipart form data found")
@@ -482,7 +522,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		// 关闭 multipart 编写器以设置分界线
 		writer.Close()
 		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
-		return bytes.NewReader(requestBody.Bytes()), nil
+		return &requestBody, nil
 
 	default:
 		return request, nil
@@ -513,7 +553,13 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 	//  转换模型推理力度后缀
 	effort, originModel := parseReasoningEffortFromModelSuffix(request.Model)
 	if effort != "" {
-		request.Reasoning.Effort = effort
+		if request.Reasoning == nil {
+			request.Reasoning = &dto.Reasoning{
+				Effort: effort,
+			}
+		} else {
+			request.Reasoning.Effort = effort
+		}
 		request.Model = originModel
 	}
 	return request, nil
