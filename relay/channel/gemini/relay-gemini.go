@@ -912,7 +912,7 @@ func GeminiChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *
 		err := common.UnmarshalJsonStr(data, &geminiResponse)
 		if err != nil {
 			logger.LogError(c, "error unmarshalling stream response: "+err.Error())
-			return nil, false
+			return false
 		}
 
 		for _, candidate := range geminiResponse.Candidates {

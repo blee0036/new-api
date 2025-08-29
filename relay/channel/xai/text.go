@@ -48,7 +48,7 @@ func xAIStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		err := json.Unmarshal([]byte(data), &xAIResp)
 		if err != nil {
 			common.SysLog("error unmarshalling stream response: " + err.Error())
-			return nil, true
+			return true
 		}
 
 		// 把 xAI 的usage转换为 OpenAI 的usage

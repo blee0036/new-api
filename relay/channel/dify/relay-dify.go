@@ -220,7 +220,7 @@ func difyStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		err := json.Unmarshal([]byte(data), &difyResponse)
 		if err != nil {
 			common.SysLog("error unmarshalling stream response: " + err.Error())
-			return nil, true
+			return true
 		}
 		var openaiResponse dto.ChatCompletionsStreamResponse
 		if difyResponse.Event == "message_end" {
