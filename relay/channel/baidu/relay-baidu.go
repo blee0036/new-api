@@ -119,7 +119,7 @@ func baiduStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		err := common.Unmarshal([]byte(data), &baiduResponse)
 		if err != nil {
 			common.SysLog("error unmarshalling stream response: " + err.Error())
-			return true
+			return nil, true
 		}
 		if baiduResponse.Usage.TotalTokens != 0 {
 			usage.TotalTokens = baiduResponse.Usage.TotalTokens

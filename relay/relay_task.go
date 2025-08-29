@@ -33,11 +33,6 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 		platform = GetTaskPlatform(c)
 	}
 
-	relayInfo, err := relaycommon.GenTaskRelayInfo(c)
-	if err != nil {
-		return service.TaskErrorWrapper(err, "gen_relay_info_failed", http.StatusInternalServerError)
-	}
-
 	adaptor := GetTaskAdaptor(platform)
 	if adaptor == nil {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("invalid api platform: %s", platform), "invalid_api_platform", http.StatusBadRequest)

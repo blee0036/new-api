@@ -3,7 +3,6 @@ package controller
 import (
 	"bytes"
 	"fmt"
-	"github.com/bytedance/gopkg/util/gopool"
 	"io"
 	"log"
 	"net/http"
