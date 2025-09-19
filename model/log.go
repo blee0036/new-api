@@ -267,9 +267,9 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
-		tx = LOG_DB.Where("logs.user_id = ?", userId)
+		tx = LOG_DB.Where("logs.user_id = ? and logs.type <> ?", userId, LogTypeError)
 	} else {
-		tx = LOG_DB.Where("logs.user_id = ? and logs.type = ?", userId, logType)
+		tx = LOG_DB.Where("logs.user_id = ? and logs.type = ? and logs.type <> ?", userId, logType, LogTypeError)
 	}
 
 	if modelName != "" {
