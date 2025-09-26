@@ -55,6 +55,7 @@ func formatUserLogs(logs []*Log) {
 		if otherMap != nil {
 			// delete admin
 			delete(otherMap, "admin_info")
+			delete(otherMap, "is_model_mapped")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = logs[i].Id % 1024
