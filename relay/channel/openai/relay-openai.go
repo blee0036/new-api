@@ -12,6 +12,7 @@ import (
 	"one-api/constant"
 	"one-api/dto"
 	"one-api/logger"
+	"one-api/relay/channel/openrouter"
 	relaycommon "one-api/relay/common"
 	"one-api/relay/helper"
 	"one-api/service"
@@ -207,6 +208,22 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	if common.DebugEnabled {
 		println("upstream response body:", string(responseBody))
 	}
+	// Unmarshal to simpleResponse
+	if info.ChannelType == constant.ChannelTypeOpenRouter && info.ChannelOtherSettings.IsOpenRouterEnterprise() {
+		// 尝试解析为 openrouter enterprise
+		var enterpriseResponse openrouter.OpenRouterEnterpriseResponse
+		err = common.Unmarshal(responseBody, &enterpriseResponse)
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+		if enterpriseResponse.Success {
+			responseBody = enterpriseResponse.Data
+		} else {
+			logger.LogError(c, fmt.Sprintf("openrouter enterprise response success=false, data: %s", enterpriseResponse.Data))
+			return nil, types.NewOpenAIError(fmt.Errorf("openrouter response success=false"), types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+	}
+
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
 		var floatResponse dto.OpenAITextFloatResponse
@@ -223,6 +240,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		simpleResponse.Usage = floatResponse.Usage
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+
 	if oaiError := simpleResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
