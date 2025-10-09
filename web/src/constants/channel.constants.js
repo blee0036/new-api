@@ -159,6 +159,21 @@ export const CHANNEL_OPTIONS = [
     color: 'purple',
     label: 'Vidu',
   },
+  {
+    value: 53,
+    color: 'blue',
+    label: 'SubModel',
+  },
+  {
+    value: 54,
+    color: 'blue',
+    label: '豆包视频',
+  },
+  {
+    value: 55,
+    color: 'green',
+    label: 'Sora',
+  },
 ];
 
 export const MODEL_TABLE_PAGE_SIZE = 10;
