@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"one-api/common"
-	"one-api/setting/operation_setting"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -152,5 +153,5 @@ func LogJson(ctx context.Context, msg string, obj any) {
 		LogError(ctx, fmt.Sprintf("json marshal failed: %s", err.Error()))
 		return
 	}
-	LogInfo(ctx, fmt.Sprintf("%s | %s", msg, string(jsonStr)))
+	LogDebug(ctx, fmt.Sprintf("%s | %s", msg, string(jsonStr)))
 }
