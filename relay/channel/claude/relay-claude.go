@@ -189,7 +189,9 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
 		claudeRequest.TopP = 0
 		claudeRequest.Temperature = common.GetPointer[float64](1.0)
-		claudeRequest.Model = strings.TrimSuffix(textRequest.Model, "-thinking")
+		if !model_setting.ShouldPreserveThinkingSuffix(textRequest.Model) {
+			claudeRequest.Model = strings.TrimSuffix(textRequest.Model, "-thinking")
+		}
 	}
 
 	if textRequest.ReasoningEffort != "" {
@@ -596,6 +598,8 @@ func FormatClaudeResponseInfo(requestMode int, claudeResponse *dto.ClaudeRespons
 			claudeInfo.Usage.PromptTokens = claudeResponse.Message.Usage.InputTokens
 			claudeInfo.Usage.PromptTokensDetails.CachedTokens = claudeResponse.Message.Usage.CacheReadInputTokens
 			claudeInfo.Usage.PromptTokensDetails.CachedCreationTokens = claudeResponse.Message.Usage.CacheCreationInputTokens
+			claudeInfo.Usage.ClaudeCacheCreation5mTokens = claudeResponse.Message.Usage.GetCacheCreation5mTokens()
+			claudeInfo.Usage.ClaudeCacheCreation1hTokens = claudeResponse.Message.Usage.GetCacheCreation1hTokens()
 			claudeInfo.Usage.CompletionTokens = claudeResponse.Message.Usage.OutputTokens
 		} else if claudeResponse.Type == "content_block_delta" {
 			if claudeResponse.Delta.Text != nil {
@@ -740,6 +744,8 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		claudeInfo.Usage.TotalTokens = claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens
 		claudeInfo.Usage.PromptTokensDetails.CachedTokens = claudeResponse.Usage.CacheReadInputTokens
 		claudeInfo.Usage.PromptTokensDetails.CachedCreationTokens = claudeResponse.Usage.CacheCreationInputTokens
+		claudeInfo.Usage.ClaudeCacheCreation5mTokens = claudeResponse.Usage.GetCacheCreation5mTokens()
+		claudeInfo.Usage.ClaudeCacheCreation1hTokens = claudeResponse.Usage.GetCacheCreation1hTokens()
 	}
 	var responseData []byte
 	switch info.RelayFormat {

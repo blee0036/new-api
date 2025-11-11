@@ -138,9 +138,11 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 			enabledIdx = append(enabledIdx, i)
 		}
 	}
-	// If no specific status list or none enabled, fall back to first key
+	// If no specific status list or none enabled, return an explicit error so caller can
+	// properly handle a channel with no available keys (e.g. mark channel disabled).
+	// Returning the first key here caused requests to keep using an already-disabled key.
 	if len(enabledIdx) == 0 {
-		return keys[0], 0, nil
+		return "", 0, types.NewError(errors.New("no enabled keys"), types.ErrorCodeChannelNoAvailableKey)
 	}
 
 	switch channel.ChannelInfo.MultiKeyMode {
@@ -688,7 +690,7 @@ func DisableChannelByTag(tag string) error {
 	return err
 }
 
-func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint) error {
+func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, paramOverride *string, headerOverride *string) error {
 	updateData := Channel{}
 	shouldReCreateAbilities := false
 	updatedTag := tag
@@ -713,6 +715,12 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 	}
 	if weight != nil {
 		updateData.Weight = weight
+	}
+	if paramOverride != nil {
+		updateData.ParamOverride = paramOverride
+	}
+	if headerOverride != nil {
+		updateData.HeaderOverride = headerOverride
 	}
 
 	err := DB.Model(&Channel{}).Where("tag = ?", tag).Updates(updateData).Error

@@ -558,6 +558,9 @@
     "启用绘图功能": "启用绘图功能",
     "启用请求体透传功能": "启用请求体透传功能",
     "启用请求透传": "启用请求透传",
+    "禁用思考处理的模型列表": "禁用思考处理的模型列表",
+    "列出的模型将不会自动添加或移除-thinking/-nothinking 后缀": "列出的模型将不会自动添加或移除-thinking/-nothinking 后缀",
+    "请输入JSON数组，如 [\"model-a\",\"model-b\"]": "请输入JSON数组，如 [\"model-a\",\"model-b\"]",
     "启用额度消费日志记录": "启用额度消费日志记录",
     "启用验证": "启用验证",
     "周": "周",
@@ -1507,6 +1510,10 @@
     "缓存倍率": "缓存倍率",
     "缓存创建 Tokens": "缓存创建 Tokens",
     "缓存创建: {{cacheCreationRatio}}": "缓存创建: {{cacheCreationRatio}}",
+    "缓存创建: 5m {{cacheCreationRatio5m}}": "缓存创建: 5m {{cacheCreationRatio5m}}",
+    "缓存创建: 1h {{cacheCreationRatio1h}}": "缓存创建: 1h {{cacheCreationRatio1h}}",
+    "缓存创建倍率 5m {{cacheCreationRatio5m}}": "缓存创建倍率 5m {{cacheCreationRatio5m}}",
+    "缓存创建倍率 1h {{cacheCreationRatio1h}}": "缓存创建倍率 1h {{cacheCreationRatio1h}}",
     "缓存创建价格：{{symbol}}{{price}} * {{ratio}} = {{symbol}}{{total}} / 1M tokens (缓存创建倍率: {{cacheCreationRatio}})": "缓存创建价格：{{symbol}}{{price}} * {{ratio}} = {{symbol}}{{total}} / 1M tokens (缓存创建倍率: {{cacheCreationRatio}})",
     "编辑": "编辑",
     "编辑API": "编辑API",
@@ -2062,6 +2069,8 @@
     "默认区域，如: us-central1": "默认区域，如: us-central1",
     "默认折叠侧边栏": "默认折叠侧边栏",
     "默认测试模型": "默认测试模型",
-    "默认补全倍率": "默认补全倍率"
+    "默认补全倍率": "默认补全倍率",
+    "Creem 介绍": "Creem 是一个简单的支付处理平台，支持固定金额产品销售，以及订阅销售。",
+    "Creem Setting Tips": "Creem 只支持预设的固定金额产品，这产品以及价格需要提前在Creem网站内创建配置，所以不支持自定义动态金额充值。在Creem端配置产品的名字以及价格，获取Product Id 后填到下面的产品，在new-api为该产品设置充值额度，以及展示价格。"
   }
 }
