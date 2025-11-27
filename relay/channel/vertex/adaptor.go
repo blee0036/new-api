@@ -39,6 +39,7 @@ var claudeModelMap = map[string]string{
 	"claude-opus-4-20250514":     "claude-opus-4@20250514",
 	"claude-opus-4-1-20250805":   "claude-opus-4-1@20250805",
 	"claude-sonnet-4-5-20250929": "claude-sonnet-4-5@20250929",
+	"claude-opus-4-5-20251101":   "claude-opus-4-5@20251101",
 }
 
 const anthropicVersion = "vertex-2023-10-16"
@@ -296,7 +297,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		info.UpstreamModelName = claudeReq.Model
 		return vertexClaudeReq, nil
 	} else if a.RequestMode == RequestModeGemini {
-		geminiRequest, err := gemini.CovertGemini2OpenAI(c, *request, info)
+		geminiRequest, err := gemini.CovertOpenAI2Gemini(c, *request, info)
 		if err != nil {
 			return nil, err
 		}
