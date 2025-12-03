@@ -426,7 +426,6 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			Role: message.Role,
 		}
 		shouldAttachThoughtSignature := attachThoughtSignature && (message.Role == "assistant" || message.Role == "model")
-		logger.LogInfo(c, fmt.Sprintf("cover openai 2 gemini, attachThoughtSignature : %t", attachThoughtSignature))
 		signatureAttached := false
 		// isToolCall := false
 		if message.ToolCalls != nil {
@@ -510,7 +509,6 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 							Data:     base64String,
 						},
 					}
-					logger.LogInfo(c, fmt.Sprintf("cover openai 2 gemini, shouldAttachThoughtSignature : %t", shouldAttachThoughtSignature))
 					if shouldAttachThoughtSignature {
 						imgPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
 					}
@@ -543,24 +541,32 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 						url := part.GetImageMedia().Url
 						return nil, fmt.Errorf("mime type is not supported by Gemini: '%s', url: '%s', supported types are: %v", fileData.MimeType, url, getSupportedMimeTypesList())
 					}
-
-					parts = append(parts, dto.GeminiPart{
+					imgPart := dto.GeminiPart{
 						InlineData: &dto.GeminiInlineData{
 							MimeType: fileData.MimeType, // 使用原始的 MimeType，因为大小写可能对API有意义
 							Data:     fileData.Base64Data,
 						},
-					})
+					}
+					if shouldAttachThoughtSignature {
+						imgPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+					}
+
+					parts = append(parts, imgPart)
 				} else {
 					format, base64String, err := service.DecodeBase64FileData(part.GetImageMedia().Url)
 					if err != nil {
 						return nil, fmt.Errorf("decode base64 image data failed: %s", err.Error())
 					}
-					parts = append(parts, dto.GeminiPart{
+					imgPart := dto.GeminiPart{
 						InlineData: &dto.GeminiInlineData{
 							MimeType: format,
 							Data:     base64String,
 						},
-					})
+					}
+					if shouldAttachThoughtSignature {
+						imgPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+					}
+					parts = append(parts, imgPart)
 				}
 			} else if part.Type == dto.ContentTypeFile {
 				if part.GetFile().FileId != "" {
@@ -623,11 +629,6 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				},
 			},
 		}
-	}
-
-	// Debug: print final geminiRequest JSON
-	if jsonData, err := json.MarshalIndent(geminiRequest, "", "  "); err == nil {
-		logger.LogInfo(c, fmt.Sprintf("Final Gemini Request JSON:\n%s", string(jsonData)))
 	}
 
 	return &geminiRequest, nil
