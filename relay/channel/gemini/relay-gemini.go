@@ -426,6 +426,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			Role: message.Role,
 		}
 		shouldAttachThoughtSignature := attachThoughtSignature && (message.Role == "assistant" || message.Role == "model")
+		logger.LogInfo(c, fmt.Sprintf("cover openai 2 gemini, attachThoughtSignature : %t", attachThoughtSignature))
 		signatureAttached := false
 		// isToolCall := false
 		if message.ToolCalls != nil {
@@ -509,6 +510,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 							Data:     base64String,
 						},
 					}
+					logger.LogInfo(c, fmt.Sprintf("cover openai 2 gemini, shouldAttachThoughtSignature : %t", shouldAttachThoughtSignature))
 					if shouldAttachThoughtSignature {
 						imgPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
 					}
@@ -621,6 +623,11 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				},
 			},
 		}
+	}
+
+	// Debug: print final geminiRequest JSON
+	if jsonData, err := json.MarshalIndent(geminiRequest, "", "  "); err == nil {
+		logger.LogInfo(c, fmt.Sprintf("Final Gemini Request JSON:\n%s", string(jsonData)))
 	}
 
 	return &geminiRequest, nil
