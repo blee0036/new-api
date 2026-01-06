@@ -186,7 +186,7 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 	if kResp.Code != 0 {
-		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf(kResp.Message), "task_failed", http.StatusBadRequest)
+		taskErr = service.TaskErrorWrapperLocal(fmt.Errorf("%s", kResp.Message), "task_failed", http.StatusBadRequest)
 		return
 	}
 	ov := dto.NewOpenAIVideo()
@@ -346,7 +346,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	}
 	taskInfo.Code = resPayload.Code
 	taskInfo.TaskID = resPayload.Data.TaskId
-	taskInfo.Reason = resPayload.Message
+	taskInfo.Reason = resPayload.Data.TaskStatusMsg
 	//任务状态，枚举值：submitted（已提交）、processing（处理中）、succeed（成功）、failed（失败）
 	status := resPayload.Data.TaskStatus
 	switch status {
