@@ -67,7 +67,8 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			request.TopP = 0
 			request.Temperature = common.GetPointer[float64](1.0)
 		}
-		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) {
+		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
+			!info.ChannelOtherSettings.KeepThinkingModelSuffix {
 			request.Model = strings.TrimSuffix(request.Model, "-thinking")
 		}
 		info.UpstreamModelName = request.Model

@@ -72,7 +72,7 @@ func RequestOpenAI2ClaudeComplete(textRequest dto.GeneralOpenAIRequest) *dto.Cla
 	return &claudeRequest
 }
 
-func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
+func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo) (*dto.ClaudeRequest, error) {
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
@@ -189,7 +189,8 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
 		claudeRequest.TopP = 0
 		claudeRequest.Temperature = common.GetPointer[float64](1.0)
-		if !model_setting.ShouldPreserveThinkingSuffix(textRequest.Model) {
+		if !model_setting.ShouldPreserveThinkingSuffix(textRequest.Model) &&
+			!info.ChannelOtherSettings.KeepThinkingModelSuffix {
 			claudeRequest.Model = strings.TrimSuffix(textRequest.Model, "-thinking")
 		}
 	}

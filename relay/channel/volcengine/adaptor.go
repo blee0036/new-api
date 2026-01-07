@@ -308,7 +308,8 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 
 	if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
 		strings.HasSuffix(info.UpstreamModelName, "-thinking") &&
-		strings.HasPrefix(info.UpstreamModelName, "deepseek") {
+		strings.HasPrefix(info.UpstreamModelName, "deepseek") &&
+		!info.ChannelOtherSettings.KeepThinkingModelSuffix {
 		info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
 		request.Model = info.UpstreamModelName
 		request.THINKING = json.RawMessage(`{"type": "enabled"}`)

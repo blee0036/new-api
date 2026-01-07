@@ -24,13 +24,14 @@ const (
 )
 
 type ChannelOtherSettings struct {
-	AzureResponsesVersion string        `json:"azure_responses_version,omitempty"`
-	VertexKeyType         VertexKeyType `json:"vertex_key_type,omitempty"` // "json" or "api_key"
-	OpenRouterEnterprise  *bool         `json:"openrouter_enterprise,omitempty"`
-	AllowServiceTier      bool          `json:"allow_service_tier,omitempty"`      // 是否允许 service_tier 透传（默认过滤以避免额外计费）
-	DisableStore          bool          `json:"disable_store,omitempty"`           // 是否禁用 store 透传（默认允许透传，禁用后可能导致 Codex 无法使用）
-	AllowSafetyIdentifier bool          `json:"allow_safety_identifier,omitempty"` // 是否允许 safety_identifier 透传（默认过滤以保护用户隐私）
-	AwsKeyType            AwsKeyType    `json:"aws_key_type,omitempty"`
+	AzureResponsesVersion   string        `json:"azure_responses_version,omitempty"`
+	VertexKeyType           VertexKeyType `json:"vertex_key_type,omitempty"` // "json" or "api_key"
+	OpenRouterEnterprise    *bool         `json:"openrouter_enterprise,omitempty"`
+	AllowServiceTier        bool          `json:"allow_service_tier,omitempty"`      // 是否允许 service_tier 透传（默认过滤以避免额外计费）
+	DisableStore            bool          `json:"disable_store,omitempty"`           // 是否禁用 store 透传（默认允许透传，禁用后可能导致 Codex 无法使用）
+	AllowSafetyIdentifier   bool          `json:"allow_safety_identifier,omitempty"` // 是否允许 safety_identifier 透传（默认过滤以保护用户隐私）
+	AwsKeyType              AwsKeyType    `json:"aws_key_type,omitempty"`
+	KeepThinkingModelSuffix bool          `json:"keep_thinking_model_suffix,omitempty"` // 是否忽略全局的ThinkingSetting设置（转化-thinking标签）
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {

@@ -235,6 +235,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 		// 适配 OpenRouter 的 thinking 后缀
 		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
+			!info.ChannelOtherSettings.KeepThinkingModelSuffix &&
 			strings.HasSuffix(info.UpstreamModelName, "-thinking") {
 			info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
 			request.Model = info.UpstreamModelName
