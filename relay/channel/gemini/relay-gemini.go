@@ -217,6 +217,13 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			"IMAGE",
 		}
 	}
+	if stopSequences := parseStopSequences(textRequest.Stop); len(stopSequences) > 0 {
+		// Gemini supports up to 5 stop sequences
+		if len(stopSequences) > 5 {
+			stopSequences = stopSequences[:5]
+		}
+		geminiRequest.GenerationConfig.StopSequences = stopSequences
+	}
 
 	adaptorWithExtraBody := false
 
@@ -637,6 +644,31 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	}
 
 	return &geminiRequest, nil
+}
+
+// parseStopSequences 解析停止序列，支持字符串或字符串数组
+func parseStopSequences(stop any) []string {
+	if stop == nil {
+		return nil
+	}
+
+	switch v := stop.(type) {
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	case []string:
+		return v
+	case []interface{}:
+		sequences := make([]string, 0, len(v))
+		for _, item := range v {
+			if str, ok := item.(string); ok && str != "" {
+				sequences = append(sequences, str)
+			}
+		}
+		return sequences
+	}
+	return nil
 }
 
 func hasFunctionCallContent(call *dto.FunctionCall) bool {
@@ -1227,6 +1259,7 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			usage.CompletionTokens = geminiResponse.UsageMetadata.CandidatesTokenCount + geminiResponse.UsageMetadata.ThoughtsTokenCount
 			usage.CompletionTokenDetails.ReasoningTokens = geminiResponse.UsageMetadata.ThoughtsTokenCount
 			usage.TotalTokens = geminiResponse.UsageMetadata.TotalTokenCount
+			usage.PromptTokensDetails.CachedTokens = geminiResponse.UsageMetadata.CachedContentTokenCount
 			for _, detail := range geminiResponse.UsageMetadata.PromptTokensDetails {
 				if detail.Modality == "AUDIO" {
 					usage.PromptTokensDetails.AudioTokens = detail.TokenCount
@@ -1371,6 +1404,7 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 			PromptTokens: geminiResponse.UsageMetadata.PromptTokenCount,
 		}
 		usage.CompletionTokenDetails.ReasoningTokens = geminiResponse.UsageMetadata.ThoughtsTokenCount
+		usage.PromptTokensDetails.CachedTokens = geminiResponse.UsageMetadata.CachedContentTokenCount
 		for _, detail := range geminiResponse.UsageMetadata.PromptTokensDetails {
 			if detail.Modality == "AUDIO" {
 				usage.PromptTokensDetails.AudioTokens = detail.TokenCount
@@ -1423,6 +1457,7 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 	}
 
 	usage.CompletionTokenDetails.ReasoningTokens = geminiResponse.UsageMetadata.ThoughtsTokenCount
+	usage.PromptTokensDetails.CachedTokens = geminiResponse.UsageMetadata.CachedContentTokenCount
 	usage.CompletionTokens = usage.TotalTokens - usage.PromptTokens
 
 	for _, detail := range geminiResponse.UsageMetadata.PromptTokensDetails {
