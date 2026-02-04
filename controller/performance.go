@@ -3,8 +3,8 @@ package controller
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
@@ -78,7 +78,8 @@ type PerformanceConfig struct {
 
 // GetPerformanceStats 获取性能统计信息
 func GetPerformanceStats(c *gin.Context) {
-	// 获取缓存统计
+	// 不再每次获取统计都全量扫描磁盘，依赖原子计数器保证性能
+	// 仅在系统启动或显式清理时同步
 	cacheStats := common.GetDiskCacheStats()
 
 	// 获取内存统计
@@ -121,27 +122,19 @@ func GetPerformanceStats(c *gin.Context) {
 	})
 }
 
-// ClearDiskCache 清理磁盘缓存
+// ClearDiskCache 清理不活跃的磁盘缓存
 func ClearDiskCache(c *gin.Context) {
-	cachePath := common.GetDiskCachePath()
-	if cachePath == "" {
-		cachePath = os.TempDir()
-	}
-	dir := filepath.Join(cachePath, "new-api-body-cache")
-
-	// 删除缓存目录
-	err := os.RemoveAll(dir)
-	if err != nil && !os.IsNotExist(err) {
+	// 清理超过 10 分钟未使用的缓存文件
+	// 10 分钟是一个安全的阈值，确保正在进行的请求不会被误删
+	err := common.CleanupOldDiskCacheFiles(10 * time.Minute)
+	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 
-	// 重置统计
-	common.ResetDiskCacheStats()
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "磁盘缓存已清理",
+		"message": "不活跃的磁盘缓存已清理",
 	})
 }
 
@@ -167,11 +160,8 @@ func ForceGC(c *gin.Context) {
 
 // getDiskCacheInfo 获取磁盘缓存目录信息
 func getDiskCacheInfo() DiskCacheInfo {
-	cachePath := common.GetDiskCachePath()
-	if cachePath == "" {
-		cachePath = os.TempDir()
-	}
-	dir := filepath.Join(cachePath, "new-api-body-cache")
+	// 使用统一的缓存目录
+	dir := common.GetDiskCacheDir()
 
 	info := DiskCacheInfo{
 		Path:   dir,
