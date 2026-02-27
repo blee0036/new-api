@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useMemo, useState } from 'react';
 import {
-  Avatar,
   Badge,
   Button,
   Card,
@@ -33,7 +32,7 @@ import {
 } from '@douyinfe/semi-ui';
 import { API, showError, showSuccess, renderQuota } from '../../helpers';
 import { getCurrencyConfig } from '../../helpers/render';
-import { Crown, RefreshCw, Sparkles } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
 import SubscriptionPurchaseModal from './modals/SubscriptionPurchaseModal';
 import {
   formatSubscriptionDuration,
@@ -83,6 +82,7 @@ const SubscriptionPlansCard = ({
   activeSubscriptions = [],
   allSubscriptions = [],
   reloadSubscriptionSelf,
+  withCard = true,
 }) => {
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -128,7 +128,11 @@ const SubscriptionPlansCard = ({
         showSuccess(t('已打开支付页面'));
         closeBuy();
       } else {
-        showError(res.data?.data || res.data?.message || t('支付失败'));
+        const errorMsg =
+          typeof res.data?.data === 'string'
+            ? res.data.data
+            : res.data?.message || t('支付失败');
+        showError(errorMsg);
       }
     } catch (e) {
       showError(t('支付请求失败'));
@@ -152,7 +156,11 @@ const SubscriptionPlansCard = ({
         showSuccess(t('已打开支付页面'));
         closeBuy();
       } else {
-        showError(res.data?.data || res.data?.message || t('支付失败'));
+        const errorMsg =
+          typeof res.data?.data === 'string'
+            ? res.data.data
+            : res.data?.message || t('支付失败');
+        showError(errorMsg);
       }
     } catch (e) {
       showError(t('支付请求失败'));
@@ -177,7 +185,11 @@ const SubscriptionPlansCard = ({
         showSuccess(t('已发起支付'));
         closeBuy();
       } else {
-        showError(res.data?.data || res.data?.message || t('支付失败'));
+        const errorMsg =
+          typeof res.data?.data === 'string'
+            ? res.data.data
+            : res.data?.message || t('支付失败');
+        showError(errorMsg);
       }
     } catch (e) {
       showError(t('支付请求失败'));
@@ -189,6 +201,16 @@ const SubscriptionPlansCard = ({
   // 当前订阅信息 - 支持多个订阅
   const hasActiveSubscription = activeSubscriptions.length > 0;
   const hasAnySubscription = allSubscriptions.length > 0;
+  const disableSubscriptionPreference = !hasActiveSubscription;
+  const isSubscriptionPreference =
+    billingPreference === 'subscription_first' ||
+    billingPreference === 'subscription_only';
+  const displayBillingPreference =
+    disableSubscriptionPreference && isSubscriptionPreference
+      ? 'wallet_first'
+      : billingPreference;
+  const subscriptionPreferenceLabel =
+    billingPreference === 'subscription_only' ? t('仅用订阅') : t('优先订阅');
 
   const planPurchaseCountMap = useMemo(() => {
     const map = new Map();
@@ -229,33 +251,9 @@ const SubscriptionPlansCard = ({
     return Math.round((used / total) * 100);
   };
 
-  return (
-    <Card className='!rounded-2xl shadow-sm border-0'>
+  const cardContent = (
+    <>
       {/* 卡片头部 */}
-      <div className='flex items-center justify-between mb-3'>
-        <div className='flex items-center'>
-          <Avatar size='small' color='violet' className='mr-3 shadow-md'>
-            <Crown size={16} />
-          </Avatar>
-          <div>
-            <Text className='text-lg font-medium'>{t('订阅套餐')}</Text>
-            <div className='text-xs'>{t('购买订阅获得模型额度/次数')}</div>
-          </div>
-        </div>
-        {/* 扣费策略 - 右上角 */}
-        <Select
-          value={billingPreference}
-          onChange={onChangeBillingPreference}
-          size='small'
-          optionList={[
-            { value: 'subscription_first', label: t('优先订阅') },
-            { value: 'wallet_first', label: t('优先钱包') },
-            { value: 'subscription_only', label: t('仅用订阅') },
-            { value: 'wallet_only', label: t('仅用钱包') },
-          ]}
-        />
-      </div>
-
       {loading ? (
         <div className='space-y-4'>
           {/* 我的订阅骨架屏 */}
@@ -269,9 +267,13 @@ const SubscriptionPlansCard = ({
             </div>
           </Card>
           {/* 套餐列表骨架屏 */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5 w-full px-1'>
             {[1, 2, 3].map((i) => (
-              <Card key={i} className='!rounded-xl' bodyStyle={{ padding: 16 }}>
+              <Card
+                key={i}
+                className='!rounded-xl w-full h-full'
+                bodyStyle={{ padding: 16 }}
+              >
                 <Skeleton.Title
                   active
                   style={{ width: '60%', height: 24, marginBottom: 8 }}
@@ -301,8 +303,8 @@ const SubscriptionPlansCard = ({
         <Space vertical style={{ width: '100%' }} spacing={8}>
           {/* 当前订阅状态 */}
           <Card className='!rounded-xl w-full' bodyStyle={{ padding: '12px' }}>
-            <div className='flex items-center justify-between mb-2'>
-              <div className='flex items-center gap-2'>
+            <div className='flex items-center justify-between mb-2 gap-3'>
+              <div className='flex items-center gap-2 flex-1 min-w-0'>
                 <Text strong>{t('我的订阅')}</Text>
                 {hasActiveSubscription ? (
                   <Tag
@@ -325,20 +327,52 @@ const SubscriptionPlansCard = ({
                   </Tag>
                 )}
               </div>
-              <Button
-                size='small'
-                theme='light'
-                type='tertiary'
-                icon={
-                  <RefreshCw
-                    size={12}
-                    className={refreshing ? 'animate-spin' : ''}
-                  />
-                }
-                onClick={handleRefresh}
-                loading={refreshing}
-              />
+              <div className='flex items-center gap-2'>
+                <Select
+                  value={displayBillingPreference}
+                  onChange={onChangeBillingPreference}
+                  size='small'
+                  optionList={[
+                    {
+                      value: 'subscription_first',
+                      label: disableSubscriptionPreference
+                        ? `${t('优先订阅')} (${t('无生效')})`
+                        : t('优先订阅'),
+                      disabled: disableSubscriptionPreference,
+                    },
+                    { value: 'wallet_first', label: t('优先钱包') },
+                    {
+                      value: 'subscription_only',
+                      label: disableSubscriptionPreference
+                        ? `${t('仅用订阅')} (${t('无生效')})`
+                        : t('仅用订阅'),
+                      disabled: disableSubscriptionPreference,
+                    },
+                    { value: 'wallet_only', label: t('仅用钱包') },
+                  ]}
+                />
+                <Button
+                  size='small'
+                  theme='light'
+                  type='tertiary'
+                  icon={
+                    <RefreshCw
+                      size={12}
+                      className={refreshing ? 'animate-spin' : ''}
+                    />
+                  }
+                  onClick={handleRefresh}
+                  loading={refreshing}
+                />
+              </div>
             </div>
+            {disableSubscriptionPreference && isSubscriptionPreference && (
+              <Text type='tertiary' size='small'>
+                {t('已保存偏好为')}
+                {subscriptionPreferenceLabel}
+                {t('，当前无生效订阅，将自动使用钱包')}
+              </Text>
+            )}
 
             {hasAnySubscription ? (
               <>
@@ -359,6 +393,7 @@ const SubscriptionPlansCard = ({
                     const usagePercent = getUsagePercent(sub);
                     const now = Date.now() / 1000;
                     const isExpired = (subscription?.end_time || 0) < now;
+                    const isCancelled = subscription?.status === 'cancelled';
                     const isActive =
                       subscription?.status === 'active' && !isExpired;
 
@@ -381,6 +416,10 @@ const SubscriptionPlansCard = ({
                               >
                                 {t('生效')}
                               </Tag>
+                            ) : isCancelled ? (
+                              <Tag color='white' size='small' shape='circle'>
+                                {t('已作废')}
+                              </Tag>
                             ) : (
                               <Tag color='white' size='small' shape='circle'>
                                 {t('已过期')}
@@ -394,7 +433,11 @@ const SubscriptionPlansCard = ({
                           )}
                         </div>
                         <div className='text-xs text-gray-500 mb-2'>
-                          {isActive ? t('至') : t('过期于')}{' '}
+                          {isActive
+                            ? t('至')
+                            : isCancelled
+                              ? t('作废于')
+                              : t('过期于')}{' '}
                           {new Date(
                             (subscription?.end_time || 0) * 1000,
                           ).toLocaleString()}
@@ -435,7 +478,7 @@ const SubscriptionPlansCard = ({
 
           {/* 可购买套餐 - 标准定价卡片 */}
           {plans.length > 0 ? (
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5 w-full px-1'>
               {plans.map((p, index) => {
                 const plan = p?.plan;
                 const totalAmount = Number(plan?.total_amount || 0);
@@ -477,15 +520,15 @@ const SubscriptionPlansCard = ({
                 return (
                   <Card
                     key={plan?.id}
-                    className={`!rounded-xl transition-all hover:shadow-lg ${
+                    className={`!rounded-xl transition-all hover:shadow-lg w-full h-full ${
                       isPopular ? 'ring-2 ring-purple-500' : ''
                     }`}
                     bodyStyle={{ padding: 0 }}
                   >
-                    <div className='p-4'>
+                    <div className='p-4 h-full flex flex-col'>
                       {/* 推荐标签 */}
                       {isPopular && (
-                        <div className='text-center mb-2'>
+                        <div className='mb-2'>
                           <Tag color='purple' shape='circle' size='small'>
                             <Sparkles size={10} className='mr-1' />
                             {t('推荐')}
@@ -493,7 +536,7 @@ const SubscriptionPlansCard = ({
                         </div>
                       )}
                       {/* 套餐名称 */}
-                      <div className='text-center mb-3'>
+                      <div className='mb-3'>
                         <Typography.Title
                           heading={5}
                           ellipsis={{ rows: 1, showTooltip: true }}
@@ -514,8 +557,8 @@ const SubscriptionPlansCard = ({
                       </div>
 
                       {/* 价格区域 */}
-                      <div className='text-center py-2'>
-                        <div className='flex items-baseline justify-center'>
+                      <div className='py-2'>
+                        <div className='flex items-baseline justify-start'>
                           <span className='text-xl font-bold text-purple-600'>
                             {symbol}
                           </span>
@@ -526,7 +569,7 @@ const SubscriptionPlansCard = ({
                       </div>
 
                       {/* 套餐权益描述 */}
-                      <div className='flex flex-col items-center gap-1 pb-2'>
+                      <div className='flex flex-col items-start gap-1 pb-2'>
                         {planBenefits.map((item) => {
                           const content = (
                             <div className='flex items-center gap-2 text-xs text-gray-500'>
@@ -538,7 +581,7 @@ const SubscriptionPlansCard = ({
                             return (
                               <div
                                 key={item.label}
-                                className='w-full flex justify-center'
+                                className='w-full flex justify-start'
                               >
                                 {content}
                               </div>
@@ -546,7 +589,7 @@ const SubscriptionPlansCard = ({
                           }
                           return (
                             <Tooltip key={item.label} content={item.tooltip}>
-                              <div className='w-full flex justify-center'>
+                              <div className='w-full flex justify-start'>
                                 {content}
                               </div>
                             </Tooltip>
@@ -554,36 +597,38 @@ const SubscriptionPlansCard = ({
                         })}
                       </div>
 
-                      <Divider margin={12} />
+                      <div className='mt-auto'>
+                        <Divider margin={12} />
 
-                      {/* 购买按钮 */}
-                      {(() => {
-                        const count = getPlanPurchaseCount(p?.plan?.id);
-                        const reached = limit > 0 && count >= limit;
-                        const tip = reached
-                          ? t('已达到购买上限') + ` (${count}/${limit})`
-                          : '';
-                        const buttonEl = (
-                          <Button
-                            theme='outline'
-                            type='tertiary'
-                            block
-                            disabled={reached}
-                            onClick={() => {
-                              if (!reached) openBuy(p);
-                            }}
-                          >
-                            {reached ? t('已达上限') : t('立即订阅')}
-                          </Button>
-                        );
-                        return reached ? (
-                          <Tooltip content={tip} position='top'>
-                            {buttonEl}
-                          </Tooltip>
-                        ) : (
-                          buttonEl
-                        );
-                      })()}
+                        {/* 购买按钮 */}
+                        {(() => {
+                          const count = getPlanPurchaseCount(p?.plan?.id);
+                          const reached = limit > 0 && count >= limit;
+                          const tip = reached
+                            ? t('已达到购买上限') + ` (${count}/${limit})`
+                            : '';
+                          const buttonEl = (
+                            <Button
+                              theme='outline'
+                              type='primary'
+                              block
+                              disabled={reached}
+                              onClick={() => {
+                                if (!reached) openBuy(p);
+                              }}
+                            >
+                              {reached ? t('已达上限') : t('立即订阅')}
+                            </Button>
+                          );
+                          return reached ? (
+                            <Tooltip content={tip} position='top'>
+                              {buttonEl}
+                            </Tooltip>
+                          ) : (
+                            buttonEl
+                          );
+                        })()}
+                      </div>
                     </div>
                   </Card>
                 );
@@ -595,6 +640,16 @@ const SubscriptionPlansCard = ({
             </div>
           )}
         </Space>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      {withCard ? (
+        <Card className='!rounded-2xl shadow-sm border-0'>{cardContent}</Card>
+      ) : (
+        <div className='space-y-3'>{cardContent}</div>
       )}
 
       {/* 购买确认弹窗 */}
@@ -622,7 +677,7 @@ const SubscriptionPlansCard = ({
         onPayCreem={payCreem}
         onPayEpay={payEpay}
       />
-    </Card>
+    </>
   );
 };
 
