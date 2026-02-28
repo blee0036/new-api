@@ -591,12 +591,16 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					return nil, fmt.Errorf("mime type is not supported by Gemini: '%s', url: '%s', supported types are: %v", mimeType, source.GetIdentifier(), getSupportedMimeTypesList())
 				}
 
-				parts = append(parts, dto.GeminiPart{
+				imagePart := dto.GeminiPart{
 					InlineData: &dto.GeminiInlineData{
 						MimeType: mimeType,
 						Data:     base64Data,
 					},
-				})
+				}
+				if shouldAttachThoughtSignature {
+					imagePart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+				}
+				parts = append(parts, imagePart)
 			} else if part.Type == dto.ContentTypeFile {
 				if part.GetFile().FileId != "" {
 					return nil, fmt.Errorf("only base64 file is supported in gemini")
@@ -606,12 +610,16 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				if err != nil {
 					return nil, fmt.Errorf("decode base64 file data failed: %s", err.Error())
 				}
-				parts = append(parts, dto.GeminiPart{
+				filePart := dto.GeminiPart{
 					InlineData: &dto.GeminiInlineData{
 						MimeType: mimeType,
 						Data:     base64Data,
 					},
-				})
+				}
+				if shouldAttachThoughtSignature {
+					filePart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+				}
+				parts = append(parts, filePart)
 			} else if part.Type == dto.ContentTypeInputAudio {
 				if part.GetInputAudio().Data == "" {
 					return nil, fmt.Errorf("only base64 audio is supported in gemini")
@@ -621,12 +629,16 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				if err != nil {
 					return nil, fmt.Errorf("decode base64 audio data failed: %s", err.Error())
 				}
-				parts = append(parts, dto.GeminiPart{
+				audioPart := dto.GeminiPart{
 					InlineData: &dto.GeminiInlineData{
 						MimeType: mimeType,
 						Data:     base64Data,
 					},
-				})
+				}
+				if shouldAttachThoughtSignature {
+					audioPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+				}
+				parts = append(parts, audioPart)
 			}
 		}
 
@@ -638,6 +650,18 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					parts[i].ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
 					break
 				}
+			}
+		}
+		if shouldAttachThoughtSignature {
+			missingImageSignature := 0
+			for i := range parts {
+				if parts[i].InlineData != nil && len(parts[i].ThoughtSignature) == 0 {
+					parts[i].ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
+					missingImageSignature++
+				}
+			}
+			if missingImageSignature > 0 {
+				logger.LogWarn(c, fmt.Sprintf("gemini thought_signature missing on %d image part(s); role=%s model=%s", missingImageSignature, message.Role, info.UpstreamModelName))
 			}
 		}
 
