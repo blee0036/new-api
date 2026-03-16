@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestFormatClaudeResponseInfo_MessageStart(t *testing.T) {
@@ -172,4 +175,69 @@ func TestFormatClaudeResponseInfo_ContentBlockDelta(t *testing.T) {
 	if claudeInfo.ResponseText.String() != "hello" {
 		t.Errorf("ResponseText = %q, want %q", claudeInfo.ResponseText.String(), "hello")
 	}
+}
+
+func TestRequestOpenAI2ClaudeMessageMapsJSONSchemaResponseFormat(t *testing.T) {
+	req := dto.GeneralOpenAIRequest{
+		Model: "claude-opus-4-6-low",
+		Messages: []dto.Message{
+			{Role: "user", Content: "translate this"},
+		},
+		ResponseFormat: &dto.ResponseFormat{
+			Type: "json_schema",
+			JsonSchema: []byte(`{
+				"name": "translation",
+				"description": "Structured translation output",
+				"schema": {
+					"type": "object",
+					"properties": {
+						"translated_text": {
+							"type": "string"
+						}
+					},
+					"required": ["translated_text"],
+					"additionalProperties": false
+				}
+			}`),
+		},
+	}
+
+	claudeReq, err := RequestOpenAI2ClaudeMessage(nil, req, &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, claudeReq.OutputConfig)
+
+	outputConfig := string(claudeReq.OutputConfig)
+	require.Equal(t, "low", gjson.Get(outputConfig, "effort").String())
+	require.Equal(t, "json_schema", gjson.Get(outputConfig, "format.type").String())
+	require.Equal(t, "translation", gjson.Get(outputConfig, "format.name").String())
+	require.Equal(t, "Structured translation output", gjson.Get(outputConfig, "format.description").String())
+	require.Equal(t, "object", gjson.Get(outputConfig, "format.schema.type").String())
+	require.Equal(t, "string", gjson.Get(outputConfig, "format.schema.properties.translated_text.type").String())
+	require.False(t, gjson.Get(outputConfig, "format.schema.additionalProperties").Bool())
+	require.Len(t, gjson.Get(outputConfig, "format.schema.required").Array(), 1)
+	require.Equal(t, "translated_text", gjson.Get(outputConfig, "format.schema.required.0").String())
+}
+
+func TestRequestOpenAI2ClaudeMessageMapsJSONObjectResponseFormat(t *testing.T) {
+	req := dto.GeneralOpenAIRequest{
+		Model: "claude-3-5-sonnet-20240620",
+		Messages: []dto.Message{
+			{Role: "user", Content: "respond in json"},
+		},
+		ResponseFormat: &dto.ResponseFormat{
+			Type: "json_object",
+		},
+	}
+
+	claudeReq, err := RequestOpenAI2ClaudeMessage(nil, req, &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, claudeReq.OutputConfig)
+
+	outputConfig := string(claudeReq.OutputConfig)
+	require.Equal(t, "json_schema", gjson.Get(outputConfig, "format.type").String())
+	require.Equal(t, "object", gjson.Get(outputConfig, "format.schema.type").String())
 }

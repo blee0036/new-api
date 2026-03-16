@@ -44,6 +44,79 @@ func maybeMarkClaudeRefusal(c *gin.Context, stopReason string) {
 	}
 }
 
+func buildClaudeOutputFormat(responseFormat *dto.ResponseFormat) (map[string]any, error) {
+	if responseFormat == nil {
+		return nil, nil
+	}
+
+	formatType := strings.TrimSpace(responseFormat.Type)
+	if formatType == "" {
+		return nil, nil
+	}
+
+	switch formatType {
+	case "json_schema":
+		if len(responseFormat.JsonSchema) == 0 {
+			return nil, fmt.Errorf("response_format.json_schema is required for Claude json_schema output")
+		}
+
+		var raw map[string]any
+		if err := common.Unmarshal(responseFormat.JsonSchema, &raw); err != nil {
+			return nil, fmt.Errorf("invalid response_format.json_schema: %w", err)
+		}
+
+		schema := any(raw)
+		if nestedSchema, ok := raw["schema"]; ok && nestedSchema != nil {
+			schema = nestedSchema
+		}
+
+		format := map[string]any{
+			"type":   "json_schema",
+			"schema": schema,
+		}
+		if name, ok := raw["name"].(string); ok && strings.TrimSpace(name) != "" {
+			format["name"] = name
+		}
+		if description, ok := raw["description"].(string); ok && strings.TrimSpace(description) != "" {
+			format["description"] = description
+		}
+		return format, nil
+	case "json_object", "json":
+		return map[string]any{
+			"type": "json_schema",
+			"schema": map[string]any{
+				"type": "object",
+			},
+		}, nil
+	default:
+		return nil, nil
+	}
+}
+
+func mergeClaudeOutputConfig(outputConfig json.RawMessage, responseFormat *dto.ResponseFormat) (json.RawMessage, error) {
+	format, err := buildClaudeOutputFormat(responseFormat)
+	if err != nil {
+		return nil, err
+	}
+	if format == nil {
+		return outputConfig, nil
+	}
+
+	config := make(map[string]any)
+	if len(outputConfig) > 0 {
+		if err := common.Unmarshal(outputConfig, &config); err != nil {
+			return nil, fmt.Errorf("invalid claude output_config: %w", err)
+		}
+	}
+
+	config["format"] = format
+	merged, err := common.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("marshal claude output_config: %w", err)
+	}
+	return merged, nil
+}
+
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo) (*dto.ClaudeRequest, error) {
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
@@ -220,6 +293,12 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 			}
 		}
 	}
+
+	mergedOutputConfig, err := mergeClaudeOutputConfig(claudeRequest.OutputConfig, textRequest.ResponseFormat)
+	if err != nil {
+		return nil, err
+	}
+	claudeRequest.OutputConfig = mergedOutputConfig
 
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string
