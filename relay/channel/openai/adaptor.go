@@ -308,6 +308,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 				}
 
 				reasoning := openrouter.RequestReasoning{
+					Enabled:   true,
 					MaxTokens: *thinking.BudgetTokens,
 				}
 
