@@ -74,12 +74,6 @@ func buildClaudeOutputFormat(responseFormat *dto.ResponseFormat) (map[string]any
 			"type":   "json_schema",
 			"schema": schema,
 		}
-		if name, ok := raw["name"].(string); ok && strings.TrimSpace(name) != "" {
-			format["name"] = name
-		}
-		if description, ok := raw["description"].(string); ok && strings.TrimSpace(description) != "" {
-			format["description"] = description
-		}
 		return format, nil
 	case "json_object", "json":
 		return map[string]any{

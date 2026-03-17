@@ -211,13 +211,13 @@ func TestRequestOpenAI2ClaudeMessageMapsJSONSchemaResponseFormat(t *testing.T) {
 	outputConfig := string(claudeReq.OutputConfig)
 	require.Equal(t, "low", gjson.Get(outputConfig, "effort").String())
 	require.Equal(t, "json_schema", gjson.Get(outputConfig, "format.type").String())
-	require.Equal(t, "translation", gjson.Get(outputConfig, "format.name").String())
-	require.Equal(t, "Structured translation output", gjson.Get(outputConfig, "format.description").String())
 	require.Equal(t, "object", gjson.Get(outputConfig, "format.schema.type").String())
 	require.Equal(t, "string", gjson.Get(outputConfig, "format.schema.properties.translated_text.type").String())
 	require.False(t, gjson.Get(outputConfig, "format.schema.additionalProperties").Bool())
 	require.Len(t, gjson.Get(outputConfig, "format.schema.required").Array(), 1)
 	require.Equal(t, "translated_text", gjson.Get(outputConfig, "format.schema.required.0").String())
+	require.False(t, gjson.Get(outputConfig, "format.name").Exists())
+	require.False(t, gjson.Get(outputConfig, "format.description").Exists())
 }
 
 func TestRequestOpenAI2ClaudeMessageMapsJSONObjectResponseFormat(t *testing.T) {
@@ -240,4 +240,6 @@ func TestRequestOpenAI2ClaudeMessageMapsJSONObjectResponseFormat(t *testing.T) {
 	outputConfig := string(claudeReq.OutputConfig)
 	require.Equal(t, "json_schema", gjson.Get(outputConfig, "format.type").String())
 	require.Equal(t, "object", gjson.Get(outputConfig, "format.schema.type").String())
+	require.False(t, gjson.Get(outputConfig, "format.name").Exists())
+	require.False(t, gjson.Get(outputConfig, "format.description").Exists())
 }
