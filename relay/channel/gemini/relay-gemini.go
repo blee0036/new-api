@@ -37,6 +37,8 @@ var geminiSupportedMimeTypes = map[string]bool{
 	"image/jpeg":      true,
 	"image/jpg":       true, // support old image/jpeg
 	"image/webp":      true,
+	"image/heic":      true,
+	"image/heif":      true,
 	"text/plain":      true,
 	"video/mov":       true,
 	"video/mpeg":      true,
@@ -583,16 +585,36 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 						Text: part.Text,
 					})
 				}
-			} else if part.Type == dto.ContentTypeImageURL {
-				// 使用统一的文件服务获取图片数据
-				var source *types.FileSource
-				imageUrl := part.GetImageMedia().Url
-				if strings.HasPrefix(imageUrl, "http") {
-					source = types.NewURLFileSource(imageUrl)
-				} else {
-					source = types.NewBase64FileSource(imageUrl, "")
+			} else {
+				switch part.Type {
+				case dto.ContentTypeFile:
+					file := part.GetFile()
+					if file == nil || file.FileData == "" || file.FileId != "" {
+						return nil, fmt.Errorf("only base64 file is supported in gemini")
+					}
+				case dto.ContentTypeInputAudio:
+					audio := part.GetInputAudio()
+					if audio == nil || audio.Data == "" {
+						return nil, fmt.Errorf("only base64 audio is supported in gemini")
+					}
 				}
-				base64Data, mimeType, err := service.GetBase64Data(c, source, "formatting image for Gemini")
+
+				source := part.ToFileSource()
+				if source == nil {
+					continue
+				}
+
+				action := "formatting file for Gemini"
+				switch part.Type {
+				case dto.ContentTypeImageURL:
+					action = "formatting image for Gemini"
+				case dto.ContentTypeInputAudio:
+					action = "formatting audio for Gemini"
+				case dto.ContentTypeVideoUrl:
+					action = "formatting video for Gemini"
+				}
+
+				base64Data, mimeType, err := service.GetBase64Data(c, source, action)
 				if err != nil {
 					return nil, fmt.Errorf("get file data from '%s' failed: %w", source.GetIdentifier(), err)
 				}
@@ -602,54 +624,12 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					return nil, fmt.Errorf("mime type is not supported by Gemini: '%s', url: '%s', supported types are: %v", mimeType, source.GetIdentifier(), getSupportedMimeTypesList())
 				}
 
-				imagePart := dto.GeminiPart{
+				parts = append(parts, dto.GeminiPart{
 					InlineData: &dto.GeminiInlineData{
 						MimeType: mimeType,
 						Data:     base64Data,
 					},
-				}
-				if shouldAttachThoughtSignature {
-					imagePart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
-				}
-				parts = append(parts, imagePart)
-			} else if part.Type == dto.ContentTypeFile {
-				if part.GetFile().FileId != "" {
-					return nil, fmt.Errorf("only base64 file is supported in gemini")
-				}
-				fileSource := types.NewBase64FileSource(part.GetFile().FileData, "")
-				base64Data, mimeType, err := service.GetBase64Data(c, fileSource, "formatting file for Gemini")
-				if err != nil {
-					return nil, fmt.Errorf("decode base64 file data failed: %s", err.Error())
-				}
-				filePart := dto.GeminiPart{
-					InlineData: &dto.GeminiInlineData{
-						MimeType: mimeType,
-						Data:     base64Data,
-					},
-				}
-				if shouldAttachThoughtSignature {
-					filePart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
-				}
-				parts = append(parts, filePart)
-			} else if part.Type == dto.ContentTypeInputAudio {
-				if part.GetInputAudio().Data == "" {
-					return nil, fmt.Errorf("only base64 audio is supported in gemini")
-				}
-				audioSource := types.NewBase64FileSource(part.GetInputAudio().Data, "audio/"+part.GetInputAudio().Format)
-				base64Data, mimeType, err := service.GetBase64Data(c, audioSource, "formatting audio for Gemini")
-				if err != nil {
-					return nil, fmt.Errorf("decode base64 audio data failed: %s", err.Error())
-				}
-				audioPart := dto.GeminiPart{
-					InlineData: &dto.GeminiInlineData{
-						MimeType: mimeType,
-						Data:     base64Data,
-					},
-				}
-				if shouldAttachThoughtSignature {
-					audioPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
-				}
-				parts = append(parts, audioPart)
+				})
 			}
 		}
 
@@ -1321,12 +1301,12 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	var imageCount int
 	responseText := strings.Builder{}
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) (*types.NewAPIError, bool) {
+	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		var geminiResponse dto.GeminiChatResponse
-		err := common.UnmarshalJsonStr(data, &geminiResponse)
-		if err != nil {
+		if err := common.UnmarshalJsonStr(data, &geminiResponse); err != nil {
 			logger.LogError(c, "error unmarshalling stream response: "+err.Error())
-			return nil, false
+			sr.Stop(fmt.Errorf("unmarshal: %w", err))
+			return
 		}
 
 		if len(geminiResponse.Candidates) == 0 && geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != nil {
@@ -1351,7 +1331,9 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			*usage = mappedUsage
 		}
 
-		return nil, callback(data, &geminiResponse)
+		if !callback(data, &geminiResponse) {
+			sr.Stop(fmt.Errorf("gemini callback stopped"))
+		}
 	})
 
 	if imageCount != 0 {

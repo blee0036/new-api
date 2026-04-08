@@ -9,6 +9,11 @@ on:
       name:
         description: 'reason'
         required: false
+      tag:
+        description: 'Tag name to build (e.g., v0.10.8-alpha.3)'
+        required: true
+        type: string
+
 env:
   REGISTRY: ghcr.io
   IMAGE: blee0036/new_api
@@ -33,28 +38,32 @@ jobs:
       contents: read
 
     steps:
-      - name: Check out (shallow)
-        uses: actions/checkout@v4
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 1
+          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && 0 || 1 }}
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Resolve tag & write VERSION
         run: |
-          git fetch --tags --force --depth=1
-          TAG=${GITHUB_REF#refs/tags/}
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            if ! git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+              echo "Error: Tag '$TAG' does not exist in the repository"
+              exit 1
+            fi
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "$TAG" > VERSION
           echo "Building tag: $TAG for ${{ matrix.arch }}"
-      
-
-      #      - name: Normalize GHCR repository
-      #        run: echo "GHCR_REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -62,15 +71,15 @@ jobs:
 
       - name: Extract metadata (labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: |
             type=raw,value=latest
             type=ref,event=tag
 
-      - name: Build & push single-arch (to both registries)
-        uses: docker/build-push-action@v6
+      - name: Build & push single-arch
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -85,51 +94,34 @@ jobs:
           sbom: false
 
   create_manifests:
-    name: Create multi-arch manifests (Docker Hub)
-    needs: [ build_single_arch ]
+    name: Create multi-arch manifests (GHCR)
+    needs: [build_single_arch]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    permissions:
+      packages: write
+      contents: read
+
     steps:
       - name: Extract tag
-        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
 
-      #      - name: Normalize GHCR repository
-      #        run: echo "GHCR_REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-
-      #      - name: Log in to the Container registry
-      #        uses: docker/login-action@v3
-      #        with:
-      #          registry: ${{ env.REGISTRY }}
-      #          username: ${{ github.actor }}
-      #          password: ${{ secrets.GITHUB_TOKEN }}
-      #
-      #
-      #      - name: Create & push manifest (Docker Hub - version)
-      #        run: |
-      #          docker buildx imagetools create \
-      #            -t calciumion/new-api:${TAG} \
-      #            calciumion/new-api:${TAG}-amd64 \
-      #            calciumion/new-api:${TAG}-arm64
-      #
-      #      - name: Create & push manifest (Docker Hub - latest)
-      #        run: |
-      #          docker buildx imagetools create \
-      #            -t calciumion/new-api:latest \
-      #            calciumion/new-api:latest-amd64 \
-      #            calciumion/new-api:latest-arm64
-
-      # ---- GHCR ----
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create & push manifest (GHCR - version)
         run: |
           docker buildx imagetools create \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${TAG} \
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${TAG}-amd64 \
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${TAG}-arm64
 

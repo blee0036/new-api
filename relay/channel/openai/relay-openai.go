@@ -122,11 +122,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var streamItems []string // store stream items
 	var lastStreamData string
 	var secondLastStreamData string // 存储倒数第二个stream data，用于音频模型
+	var streamErr *types.NewAPIError
 
 	// 检查是否为音频模型
 	isAudioModel := strings.Contains(strings.ToLower(model), "audio")
 
-	streamErr := helper.StreamScannerHandler(c, resp, info, func(data string) (*types.NewAPIError, bool) {
+	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		// openRouter check
 		if c.GetBool("check_inside_err") && lastStreamData == "" {
 			var simpleResponse dto.OpenAITextResponse
@@ -137,17 +138,21 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 					if !isInt {
 						openRouteStatusCode = 500
 					}
-					return types.WithOpenAIError(*oaiError, openRouteStatusCode), false
+					streamErr = types.WithOpenAIError(*oaiError, openRouteStatusCode)
+					sr.Stop(streamErr)
+					return
 				}
 				if simpleResponse.Object == "error" {
-					return types.NewErrorWithStatusCode(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError), false
+					streamErr = types.NewErrorWithStatusCode(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError)
+					sr.Stop(streamErr)
+					return
 				}
 			}
 		}
 		if lastStreamData != "" {
-			err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
-			if err != nil {
+			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
+				sr.Error(err)
 			}
 		}
 		if len(data) > 0 {
@@ -159,7 +164,6 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			lastStreamData = data
 			streamItems = append(streamItems, data)
 		}
-		return nil, true
 	})
 
 	if streamErr != nil {
@@ -663,6 +667,12 @@ func applyUsagePostProcessing(info *relaycommon.RelayInfo, usage *dto.Usage, res
 				usage.PromptTokensDetails.CachedTokens = usage.PromptCacheHitTokens
 			}
 		}
+	case constant.ChannelTypeOpenAI:
+		if usage.PromptTokensDetails.CachedTokens == 0 {
+			if cachedTokens, ok := extractLlamaCachedTokensFromBody(responseBody); ok {
+				usage.PromptTokensDetails.CachedTokens = cachedTokens
+			}
+		}
 	}
 }
 
@@ -724,4 +734,26 @@ func extractMoonshotCachedTokensFromBody(body []byte) (int, bool) {
 	}
 
 	return 0, false
+}
+
+// extractLlamaCachedTokensFromBody 从llama.cpp的非标准位置提取cache_n
+func extractLlamaCachedTokensFromBody(body []byte) (int, bool) {
+	if len(body) == 0 {
+		return 0, false
+	}
+
+	var payload struct {
+		Timings struct {
+			CachedTokens *int `json:"cache_n"`
+		} `json:"timings"`
+	}
+
+	if err := common.Unmarshal(body, &payload); err != nil {
+		return 0, false
+	}
+
+	if payload.Timings.CachedTokens == nil {
+		return 0, false
+	}
+	return *payload.Timings.CachedTokens, true
 }
