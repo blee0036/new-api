@@ -112,7 +112,19 @@ func processChatCompletions(streamResp string, streamItems []string, responseTex
 		for _, item := range streamItems {
 			var streamResponse dto.ChatCompletionsStreamResponse
 			if err := json.Unmarshal(common.StringToByteSlice(item), &streamResponse); err != nil {
-				return err
+				var floatResponse dto.ChatCompletionsStreamFloatResponse
+				if floatErr := json.Unmarshal(common.StringToByteSlice(item), &floatResponse); floatErr != nil {
+					// 一次性解析失败，逐个解析
+					common.SysLog("error unmarshalling stream response: " + floatErr.Error())
+					return floatErr
+				}
+				streamResponse.Id = floatResponse.Id
+				streamResponse.Model = floatResponse.Model
+				streamResponse.Object = floatResponse.Object
+				streamResponse.Created = int64(floatResponse.Created * 1000) // 转换为毫秒时间戳
+				streamResponse.SystemFingerprint = floatResponse.SystemFingerprint
+				streamResponse.Choices = floatResponse.Choices
+				streamResponse.Usage = floatResponse.Usage
 			}
 			if err := ProcessStreamResponse(streamResponse, responseTextBuilder, toolCount); err != nil {
 				common.SysLog("error processing stream response: " + err.Error())

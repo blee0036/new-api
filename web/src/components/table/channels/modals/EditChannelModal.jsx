@@ -209,6 +209,8 @@ const EditChannelModal = (props) => {
     upstream_model_update_last_check_time: 0,
     upstream_model_update_last_detected_models: [],
     upstream_model_update_ignored_models: '',
+    // 忽略全局-thinking tag设置，直接透传模型名
+    keep_thinking_model_suffix: false
   };
   const [batch, setBatch] = useState(false);
   const [multiToSingle, setMultiToSingle] = useState(false);
@@ -901,6 +903,8 @@ const EditChannelModal = (props) => {
           )
             ? parsedSettings.upstream_model_update_ignored_models.join(',')
             : '';
+          data.keep_thinking_model_suffix =
+            parsedSettings.keep_thinking_model_suffix || false;
         } catch (error) {
           console.error('解析其他设置失败:', error);
           data.azure_responses_version = '';
@@ -919,6 +923,7 @@ const EditChannelModal = (props) => {
           data.upstream_model_update_last_check_time = 0;
           data.upstream_model_update_last_detected_models = [];
           data.upstream_model_update_ignored_models = '';
+          data.keep_thinking_model_suffix = false;
         }
       } else {
         // 兼容历史数据：老渠道没有 settings 时，默认按 json 展示
@@ -936,6 +941,7 @@ const EditChannelModal = (props) => {
         data.upstream_model_update_last_check_time = 0;
         data.upstream_model_update_last_detected_models = [];
         data.upstream_model_update_ignored_models = '';
+        data.keep_thinking_model_suffix = false;
       }
 
       if (
@@ -1703,6 +1709,10 @@ const EditChannelModal = (props) => {
       }
     }
 
+    // 忽略全局-thinking tag设置直接透传
+    settings.keep_thinking_model_suffix =
+      localInputs.keep_thinking_model_suffix === true;
+
     // type === 20: 设置企业账户标识，无论是true还是false都要传到后端
     if (localInputs.type === 20) {
       settings.openrouter_enterprise =
@@ -1787,6 +1797,7 @@ const EditChannelModal = (props) => {
     delete localInputs.upstream_model_update_last_check_time;
     delete localInputs.upstream_model_update_last_detected_models;
     delete localInputs.upstream_model_update_ignored_models;
+    delete localInputs.keep_thinking_model_suffix;
 
     let res;
     localInputs.auto_ban = localInputs.auto_ban ? 1 : 0;
@@ -3881,6 +3892,20 @@ const EditChannelModal = (props) => {
                         )
                       }
                       extraText={t('启用请求体透传功能')}
+                    />
+
+                    <Form.Switch
+                      field='keep_thinking_model_suffix'
+                      label={t('保留思考适配模型后缀')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleChannelSettingsChange(
+                          'keep_thinking_model_suffix',
+                          value,
+                        )
+                      }
+                      extraText={t('直接向上游发送带-thinking等思考适配的模型名。（thinking对应的参数修改依然保留）')}
                     />
 
                     <Form.Input

@@ -358,6 +358,9 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if nil != channel.OpenAIOrganization && *channel.OpenAIOrganization != "" {
 		common.SetContextKey(c, constant.ContextKeyChannelOrganization, *channel.OpenAIOrganization)
 	}
+	if channel.Type == constant.ChannelTypeOpenRouter || strings.Contains(channel.Name, "chute") {
+		c.Set("check_inside_err", true)
+	}
 	common.SetContextKey(c, constant.ContextKeyChannelAutoBan, channel.GetAutoBan())
 	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, channel.GetModelMapping())
 	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())

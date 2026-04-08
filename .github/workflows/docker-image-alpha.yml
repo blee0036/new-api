@@ -9,6 +9,9 @@ on:
       name:
         description: "reason"
         required: false
+env:
+  REGISTRY: ghcr.io
+  IMAGE: blee0036/new_api
 
 jobs:
   build_single_arch:
@@ -57,7 +60,7 @@ jobs:
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 

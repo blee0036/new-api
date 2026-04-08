@@ -87,6 +87,9 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if lo.FromPtrOr(request.TopP, 0) >= 1 {
 		request.TopP = lo.ToPtr(0.99)
 	}
+	if request.Temperature != nil && *request.Temperature >= 1 {
+		*request.Temperature = 1
+	}
 	return requestOpenAI2Zhipu(*request), nil
 }
 

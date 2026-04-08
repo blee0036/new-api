@@ -224,14 +224,19 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 			header.Set("Authorization", "Bearer "+info.ApiKey)
 		}
 	}
-	if info.ChannelType == constant.ChannelTypeOpenRouter {
-		if header.Get("HTTP-Referer") == "" {
-			header.Set("HTTP-Referer", "https://www.newapi.ai")
-		}
-		if header.Get("X-OpenRouter-Title") == "" {
-			header.Set("X-OpenRouter-Title", "New API")
-		}
-	}
+	header.Set("User-Agent", " sd/JS 4.54.0")
+	header.Set("X-Middleware-Subrequest", "app/api/chat/openai/route")
+	header.Set("X-Stainless-Arch", "other:edge-runtime")
+	header.Set("X-Stainless-Lang", "js")
+	header.Set("X-Stainless-Os", "Unknown")
+	header.Set("X-Stainless-Package-Version", "4.54.0")
+	header.Set("X-Stainless-Runtime", "edge")
+	header.Set("Accept-Language", "*")
+	header.Set("Sec-Fetch-Mode", "cors")
+	//if info.ChannelType == common.ChannelTypeOpenRouter {
+	//	header.Set("HTTP-Referer", "https://github.com/Calcium-Ion/new-api")
+	//	header.Set("X-Title", "New API")
+	//}
 	return nil
 }
 
@@ -248,6 +253,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 		// 适配 OpenRouter 的 thinking 后缀
 		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
+			!info.ChannelOtherSettings.KeepThinkingModelSuffix &&
 			strings.HasSuffix(info.UpstreamModelName, "-thinking") {
 			info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
 			request.Model = info.UpstreamModelName
@@ -319,7 +325,8 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 
 	}
-	if strings.HasPrefix(info.UpstreamModelName, "o") || strings.HasPrefix(info.UpstreamModelName, "gpt-5") {
+
+	if strings.HasPrefix(info.UpstreamModelName, "o") || strings.HasPrefix(info.UpstreamModelName, "gpt-5") || strings.HasPrefix(info.UpstreamModelName, "gpt-oss") {
 		if lo.FromPtrOr(request.MaxCompletionTokens, uint(0)) == 0 && lo.FromPtrOr(request.MaxTokens, uint(0)) != 0 {
 			request.MaxCompletionTokens = request.MaxTokens
 			request.MaxTokens = nil
@@ -346,8 +353,13 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 
 		info.ReasoningEffort = request.ReasoningEffort
 
-		// o系列模型developer适配（o1-mini除外）
-		if !strings.HasPrefix(info.UpstreamModelName, "o1-mini") && !strings.HasPrefix(info.UpstreamModelName, "o1-preview") {
+		if strings.HasPrefix(info.UpstreamModelName, "gpt-oss") {
+			//修改第一个Message的内容，将developer改为developer
+			if len(request.Messages) > 0 && request.Messages[0].Role == "developer" {
+				request.Messages[0].Role = "system"
+			}
+		} else if !strings.HasPrefix(info.UpstreamModelName, "o1-mini") && !strings.HasPrefix(info.UpstreamModelName, "o1-preview") {
+			// o系列模型developer适配（o1-mini除外）
 			//修改第一个Message的内容，将system改为developer
 			if len(request.Messages) > 0 && request.Messages[0].Role == "system" {
 				request.Messages[0].Role = "developer"

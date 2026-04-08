@@ -126,7 +126,24 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	// 检查是否为音频模型
 	isAudioModel := strings.Contains(strings.ToLower(model), "audio")
 
-	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+	streamErr := helper.StreamScannerHandler(c, resp, info, func(data string) (*types.NewAPIError, bool) {
+		// openRouter check
+		if c.GetBool("check_inside_err") && lastStreamData == "" {
+			var simpleResponse dto.OpenAITextResponse
+			jsonErr := common.UnmarshalJsonStr(data, &simpleResponse)
+			if jsonErr == nil {
+				if oaiError := simpleResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
+					openRouteStatusCode, isInt := oaiError.Code.(int)
+					if !isInt {
+						openRouteStatusCode = 500
+					}
+					return types.WithOpenAIError(*oaiError, openRouteStatusCode), false
+				}
+				if simpleResponse.Object == "error" {
+					return types.NewErrorWithStatusCode(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError), false
+				}
+			}
+		}
 		if lastStreamData != "" {
 			err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 			if err != nil {
@@ -142,8 +159,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			lastStreamData = data
 			streamItems = append(streamItems, data)
 		}
-		return true
+		return nil, true
 	})
+
+	if streamErr != nil {
+		return nil, streamErr
+	}
 
 	// 对音频模型，从倒数第二个stream data中提取usage信息
 	if isAudioModel && secondLastStreamData != "" {
@@ -222,11 +243,26 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
+		var floatResponse dto.OpenAITextFloatResponse
+		floatErr := common.Unmarshal(responseBody, &floatResponse)
+		if floatErr != nil {
+			return nil, types.NewErrorWithStatusCode(floatErr, "unmarshal_response_body_failed", http.StatusInternalServerError)
+		}
+		simpleResponse.Id = floatResponse.Id
+		simpleResponse.Model = floatResponse.Model
+		simpleResponse.Object = floatResponse.Object
+		simpleResponse.Created = int64(floatResponse.Created * 1000) // 转换为毫秒时间戳
+		simpleResponse.Choices = floatResponse.Choices
+		simpleResponse.Error = floatResponse.Error
+		simpleResponse.Usage = floatResponse.Usage
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
 	if oaiError := simpleResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
+	}
+	if simpleResponse.Object == "error" && c.GetBool("check_inside_err") {
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("invalid response"), "upstream err", http.StatusInternalServerError)
 	}
 
 	for _, choice := range simpleResponse.Choices {

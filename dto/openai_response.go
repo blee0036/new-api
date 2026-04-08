@@ -51,6 +51,21 @@ func (o *OpenAITextResponse) GetOpenAIError() *types.OpenAIError {
 	return GetOpenAIError(o.Error)
 }
 
+type OpenAITextFloatResponse struct {
+	Id      string                     `json:"id"`
+	Model   string                     `json:"model"`
+	Object  string                     `json:"object"`
+	Created float64                    `json:"created"`
+	Choices []OpenAITextResponseChoice `json:"choices"`
+	Error   *types.OpenAIError         `json:"error,omitempty"`
+	Usage   `json:"usage"`
+}
+
+// GetOpenAIError 从动态错误类型中提取OpenAIError结构
+func (o *OpenAITextFloatResponse) GetOpenAIError() *types.OpenAIError {
+	return GetOpenAIError(o.Error)
+}
+
 type OpenAIEmbeddingResponseItem struct {
 	Object    string    `json:"object"`
 	Index     int       `json:"index"`
@@ -142,6 +157,16 @@ type ChatCompletionsStreamResponse struct {
 	Id                string                                `json:"id"`
 	Object            string                                `json:"object"`
 	Created           int64                                 `json:"created"`
+	Model             string                                `json:"model"`
+	SystemFingerprint *string                               `json:"system_fingerprint"`
+	Choices           []ChatCompletionsStreamResponseChoice `json:"choices"`
+	Usage             *Usage                                `json:"usage"`
+}
+
+type ChatCompletionsStreamFloatResponse struct {
+	Id                string                                `json:"id"`
+	Object            string                                `json:"object"`
+	Created           float64                               `json:"created"`
 	Model             string                                `json:"model"`
 	SystemFingerprint *string                               `json:"system_fingerprint"`
 	Choices           []ChatCompletionsStreamResponseChoice `json:"choices"`

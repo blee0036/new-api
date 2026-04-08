@@ -59,6 +59,7 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			// Remove admin-only debug fields.
 			delete(otherMap, "admin_info")
 			delete(otherMap, "reject_reason")
+			delete(otherMap, "is_model_mapped")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = startIdx + i + 1
@@ -331,9 +332,9 @@ const logSearchCountLimit = 10000
 func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
-		tx = LOG_DB.Where("logs.user_id = ?", userId)
+		tx = LOG_DB.Where("logs.user_id = ? and logs.type <> ?", userId, LogTypeError)
 	} else {
-		tx = LOG_DB.Where("logs.user_id = ? and logs.type = ?", userId, logType)
+		tx = LOG_DB.Where("logs.user_id = ? and logs.type = ? and logs.type <> ?", userId, logType, LogTypeError)
 	}
 
 	if modelName != "" {
@@ -477,4 +478,40 @@ func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64,
 	}
 
 	return total, nil
+}
+
+func DeleteOldLogBySelect(targetTimestamp int64) (int64, error) {
+	const queryBatchSize = 10000
+	const deleteBatchSize = 500
+	var totalDeleted int64
+
+	for {
+		var ids []int64
+		err := LOG_DB.Select("id").
+			Model(&Log{}).
+			Where("created_at < ?", targetTimestamp).
+			Limit(queryBatchSize).
+			Find(&ids).
+			Error
+		if err != nil {
+			return totalDeleted, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+
+		for i := 0; i < len(ids); i += deleteBatchSize {
+			end := i + deleteBatchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			batch := ids[i:end]
+
+			tx := LOG_DB.Begin()
+			result := tx.Where("id IN (?)", batch).Delete(&Log{}).Commit()
+			totalDeleted += result.RowsAffected
+		}
+	}
+
+	return totalDeleted, nil
 }

@@ -91,6 +91,7 @@ func GeminiTextGenerationStreamHandler(c *gin.Context, info *relaycommon.RelayIn
 			logger.LogError(c, "failed to write stream data: "+err.Error())
 			return false
 		}
+
 		info.SendResponseCount++
 		return true
 	})

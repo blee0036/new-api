@@ -54,7 +54,9 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
 		strings.HasPrefix(request.Model, "claude-opus-4-6") {
-		request.Model = baseModel
+		if !info.ChannelOtherSettings.KeepThinkingModelSuffix {
+			request.Model = baseModel
+		}
 		request.Thinking = &dto.Thinking{
 			Type: "adaptive",
 		}
@@ -78,7 +80,8 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
 			request.Temperature = common.GetPointer[float64](1.0)
 		}
-		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) {
+		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
+			!info.ChannelOtherSettings.KeepThinkingModelSuffix {
 			request.Model = strings.TrimSuffix(request.Model, "-thinking")
 		}
 		info.UpstreamModelName = request.Model

@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/QuantumNous/new-api/types"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
@@ -34,10 +36,10 @@ func getScannerBufferSize() int {
 	return DefaultMaxScannerBufferSize
 }
 
-func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) bool) {
+func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string) (*types.NewAPIError, bool)) *types.NewAPIError {
 
 	if resp == nil || dataHandler == nil {
-		return
+		return nil
 	}
 
 	// 确保响应体总是被关闭
@@ -176,6 +178,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		})
 	}
 
+	var streamErr *types.NewAPIError = nil
 	dataChan := make(chan string, 10)
 
 	wg.Add(1)
@@ -189,9 +192,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		}()
 		for data := range dataChan {
 			writeMutex.Lock()
-			success := dataHandler(data)
+			handlerErr, success := dataHandler(data)
 			writeMutex.Unlock()
 			if !success {
+				streamErr = handlerErr
 				return
 			}
 		}
@@ -280,4 +284,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		// 客户端断开连接
 		logger.LogInfo(c, "client disconnected")
 	}
+
+	if streamErr != nil {
+		return streamErr
+	}
+
+	return nil
 }
