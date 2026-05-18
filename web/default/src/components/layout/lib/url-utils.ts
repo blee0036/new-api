@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import type { LinkProps } from '@tanstack/react-router'
 import type { NavItem, NavCollapsible } from '../types'
 
@@ -40,11 +58,16 @@ export function checkIsActive(
   item: NavItem,
   mainNav = false
 ): boolean {
+  const hrefWithoutQuery = href.split('?')[0]
+
+  if (item.activeUrls?.some((url) => urlToString(url) === hrefWithoutQuery)) {
+    return true
+  }
+
   // For collapsible items (NavCollapsible), check sub-items first
   if ('items' in item && item.items) {
     const collapsibleItem = item as NavCollapsible
     const items = collapsibleItem.items
-    const hrefWithoutQuery = href.split('?')[0]
 
     // Check if any sub-item matches
     if (
@@ -76,7 +99,6 @@ export function checkIsActive(
   // Exact match
   if (href === itemUrl) return true
 
-  const hrefWithoutQuery = href.split('?')[0]
   const itemUrlWithoutQuery = itemUrl.split('?')[0]
   const itemUrlHasQuery = itemUrl.includes('?')
 

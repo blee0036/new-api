@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +29,22 @@ import { buildApiParams } from '../lib/utils'
 import { useUsageLogsContext } from './usage-logs-provider'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
+
+function StatBadge(props: {
+  label: string
+  value: string | number
+  accent: string
+}) {
+  return (
+    <span className='border-border/60 bg-muted/25 inline-flex h-7 items-center gap-2 rounded-md border px-2.5 text-xs shadow-xs'>
+      <span className={cn('h-3.5 w-0.5 rounded-full', props.accent)} />
+      <span className='text-muted-foreground'>{props.label}</span>
+      <span className='text-foreground/85 font-mono font-semibold tabular-nums'>
+        {props.value}
+      </span>
+    </span>
+  )
+}
 
 export function CommonLogsStats() {
   const { t } = useTranslation()
@@ -50,36 +84,23 @@ export function CommonLogsStats() {
     )
   }
 
-  const tagClass =
-    'inline-flex h-7 items-center rounded-md border px-3 py-1 text-xs font-medium shadow-xs'
-
   return (
     <div className='flex flex-wrap items-center gap-2'>
-      <span
-        className={cn(
-          tagClass,
-          'border-blue-200/70 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300'
-        )}
-      >
-        {t('Usage')}:{' '}
-        {sensitiveVisible ? formatLogQuota(stats?.quota || 0) : '••••'}
-      </span>
-      <span
-        className={cn(
-          tagClass,
-          'border-pink-200/70 bg-pink-50 text-pink-700 dark:border-pink-500/20 dark:bg-pink-500/10 dark:text-pink-300'
-        )}
-      >
-        {t('RPM')}: {stats?.rpm || 0}
-      </span>
-      <span
-        className={cn(
-          tagClass,
-          'border-border bg-background text-muted-foreground'
-        )}
-      >
-        {t('TPM')}: {stats?.tpm || 0}
-      </span>
+      <StatBadge
+        label={t('Usage')}
+        value={sensitiveVisible ? formatLogQuota(stats?.quota || 0) : '••••'}
+        accent='bg-sky-500/70'
+      />
+      <StatBadge
+        label={t('RPM')}
+        value={stats?.rpm || 0}
+        accent='bg-rose-500/65'
+      />
+      <StatBadge
+        label={t('TPM')}
+        value={stats?.tpm || 0}
+        accent='bg-slate-400/70'
+      />
     </div>
   )
 }

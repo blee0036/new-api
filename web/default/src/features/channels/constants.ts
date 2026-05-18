@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 // ============================================================================
 // Channel Types (from constant/channel.go)
 // All label/name values are i18n keys; use t(value) when displaying.
@@ -60,15 +78,30 @@ export const CHANNEL_TYPES = {
   57: 'Codex',
 } as const
 
-export const CHANNEL_TYPE_OPTIONS = Object.entries(CHANNEL_TYPES)
-  .filter(([value]) => {
-    const num = Number(value)
-    return num !== 0 // Exclude Unknown
-  })
-  .map(([value, label]) => ({
-    value: Number(value),
-    label,
-  }))
+const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
+  1, 14, 33, 24, 43, 3, 41, 48, 42, 34, 20, 4, 40, 27, 25, 17, 26, 15, 46, 23,
+  18, 45, 31, 35, 49, 19, 47, 37, 38, 39, 11, 8, 57, 22, 21, 44, 2, 5, 36, 50,
+  51, 52, 53, 54, 55, 56,
+]
+
+export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
+  const ordered: { value: number; label: string }[] = []
+  const seen = new Set<number>()
+  for (const id of CHANNEL_TYPE_DISPLAY_ORDER) {
+    const label = CHANNEL_TYPES[id as keyof typeof CHANNEL_TYPES]
+    if (label) {
+      ordered.push({ value: id, label })
+      seen.add(id)
+    }
+  }
+  for (const [key, label] of Object.entries(CHANNEL_TYPES)) {
+    const id = Number(key)
+    if (id !== 0 && !seen.has(id)) {
+      ordered.push({ value: id, label })
+    }
+  }
+  return ordered
+})()
 
 // ============================================================================
 // Channel Status (label values are i18n keys; use t(config.label) in components)
@@ -347,7 +380,7 @@ export const FIELD_DESCRIPTIONS = {
 // ============================================================================
 
 export const MODEL_FETCHABLE_TYPES = new Set([
-  1, 4, 14, 17, 20, 23, 24, 25, 26, 31, 34, 35, 40, 42, 43, 47, 48,
+  1, 4, 14, 17, 20, 23, 24, 25, 26, 27, 31, 34, 35, 40, 42, 43, 47, 48,
 ])
 
 export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
