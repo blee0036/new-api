@@ -1,10 +1,13 @@
 package claude
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -109,6 +112,72 @@ func mergeClaudeOutputConfig(outputConfig json.RawMessage, responseFormat *dto.R
 		return nil, fmt.Errorf("marshal claude output_config: %w", err)
 	}
 	return merged, nil
+}
+
+func inferOpenAIFileMimeType(mediaMessage dto.MediaContent) string {
+	if mediaMessage.Type != dto.ContentTypeFile {
+		return ""
+	}
+	file := mediaMessage.GetFile()
+	if file == nil || file.FileName == "" {
+		return ""
+	}
+	return mime.TypeByExtension(filepath.Ext(file.FileName))
+}
+
+func withInferredOpenAIFileMimeType(mediaMessage dto.MediaContent, source types.FileSource) types.FileSource {
+	mimeType := inferOpenAIFileMimeType(mediaMessage)
+	if mimeType == "" {
+		return source
+	}
+	if base64Source, ok := source.(*types.Base64Source); ok {
+		base64Source.MimeType = mimeType
+	}
+	return source
+}
+
+func normalizedMimeType(mimeType string) string {
+	mimeType = strings.TrimSpace(strings.ToLower(mimeType))
+	if idx := strings.Index(mimeType, ";"); idx >= 0 {
+		mimeType = strings.TrimSpace(mimeType[:idx])
+	}
+	return mimeType
+}
+
+func appendClaudeFileContent(claudeMediaMessages []dto.ClaudeMediaMessage, base64Data string, mimeType string) ([]dto.ClaudeMediaMessage, error) {
+	normalized := normalizedMimeType(mimeType)
+	if normalized == "" {
+		return claudeMediaMessages, nil
+	}
+	if strings.HasPrefix(normalized, "text/") {
+		decoded, err := base64.StdEncoding.DecodeString(base64Data)
+		if err != nil {
+			return nil, fmt.Errorf("decode text file data: %w", err)
+		}
+		claudeMediaMessages = append(claudeMediaMessages, dto.ClaudeMediaMessage{
+			Type: "text",
+			Text: common.GetPointer[string](string(decoded)),
+		})
+		return claudeMediaMessages, nil
+	}
+	if normalized != "application/pdf" && !strings.HasPrefix(normalized, "image/") {
+		return claudeMediaMessages, nil
+	}
+
+	claudeMediaMessage := dto.ClaudeMediaMessage{
+		Source: &dto.ClaudeMessageSource{
+			Type:      "base64",
+			MediaType: normalized,
+			Data:      base64Data,
+		},
+	}
+	if normalized == "application/pdf" {
+		claudeMediaMessage.Type = "document"
+	} else {
+		claudeMediaMessage.Type = "image"
+	}
+	claudeMediaMessages = append(claudeMediaMessages, claudeMediaMessage)
+	return claudeMediaMessages, nil
 }
 
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo) (*dto.ClaudeRequest, error) {
@@ -221,7 +290,9 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	}
 
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(textRequest.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") || strings.HasPrefix(textRequest.Model, "claude-opus-4-7")) {
+		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") ||
+			strings.HasPrefix(textRequest.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(textRequest.Model, "claude-opus-4-8")) {
 		if !info.ChannelOtherSettings.KeepThinkingModelSuffix {
 			claudeRequest.Model = baseModel
 		}
@@ -229,8 +300,9 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 			Type: "adaptive",
 		}
 		claudeRequest.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
-		if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400
+		if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
+			strings.HasPrefix(baseModel, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400
 			// and defaults display to "omitted"; restore the 4.6 visible summary.
 			claudeRequest.Thinking.Display = "summarized"
 			claudeRequest.Temperature = nil
@@ -244,8 +316,9 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		strings.HasSuffix(textRequest.Model, "-thinking") {
 
 		trimmedModel := strings.TrimSuffix(textRequest.Model, "-thinking")
-		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") {
-			// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
+		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") ||
+			strings.HasPrefix(trimmedModel, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
 			claudeRequest.Thinking = &dto.Thinking{Type: "adaptive", Display: "summarized"}
 			claudeRequest.OutputConfig = json.RawMessage(`{"effort":"high"}`)
 			claudeRequest.Temperature = nil
@@ -457,24 +530,15 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 						if source == nil {
 							continue
 						}
+						source = withInferredOpenAIFileMimeType(mediaMessage, source)
 						base64Data, mimeType, err := service.GetBase64Data(c, source, "formatting image for Claude")
 						if err != nil {
 							return nil, fmt.Errorf("get file data failed: %s", err.Error())
 						}
-						claudeMediaMessage := dto.ClaudeMediaMessage{
-							Source: &dto.ClaudeMessageSource{
-								Type: "base64",
-							},
+						claudeMediaMessages, err = appendClaudeFileContent(claudeMediaMessages, base64Data, mimeType)
+						if err != nil {
+							return nil, err
 						}
-						if strings.HasPrefix(mimeType, "application/pdf") {
-							claudeMediaMessage.Type = "document"
-						} else {
-							claudeMediaMessage.Type = "image"
-						}
-
-						claudeMediaMessage.Source.MediaType = mimeType
-						claudeMediaMessage.Source.Data = base64Data
-						claudeMediaMessages = append(claudeMediaMessages, claudeMediaMessage)
 						continue
 					}
 				}
@@ -518,10 +582,7 @@ func StreamResponseClaude2OpenAI(claudeResponse *dto.ClaudeResponse) *dto.ChatCo
 	tools := make([]dto.ToolCallResponse, 0)
 	fcIdx := 0
 	if claudeResponse.Index != nil {
-		fcIdx = *claudeResponse.Index - 1
-		if fcIdx < 0 {
-			fcIdx = 0
-		}
+		fcIdx = *claudeResponse.Index
 	}
 	var choice dto.ChatCompletionsStreamResponseChoice
 	if claudeResponse.Type == "message_start" {
