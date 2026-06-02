@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
 
@@ -229,9 +230,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(params.Other)
+	createdAt := common.GetTimestamp()
 	// 判断是否需要记录 IP
 	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
+	if settingMap, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting); ok {
+		needRecordIp = settingMap.RecordIpLog
+	} else if settingMap, err := GetUserSetting(userId, false); err == nil {
 		if settingMap.RecordIpLog {
 			needRecordIp = true
 		}
@@ -239,7 +243,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
-		CreatedAt:        common.GetTimestamp(),
+		CreatedAt:        createdAt,
 		Type:             LogTypeConsume,
 		Content:          params.Content,
 		PromptTokens:     params.PromptTokens,
@@ -262,15 +266,21 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := LOG_DB.Create(log).Error
-	if err != nil {
-		logger.LogError(c, "failed to record log: "+err.Error())
-	}
+	item := consumeLogBatchItem{log: log}
 	if common.DataExportEnabled {
-		gopool.Go(func() {
-			LogQuotaData(userId, username, params.ModelName, params.Quota, common.GetTimestamp(), params.PromptTokens+params.CompletionTokens)
-		})
+		item.dataExport = &consumeLogDataExport{
+			userId:    userId,
+			username:  username,
+			modelName: params.ModelName,
+			quota:     params.Quota,
+			createdAt: createdAt,
+			tokenUsed: params.PromptTokens + params.CompletionTokens,
+		}
 	}
+	if enqueueConsumeLog(item) {
+		return
+	}
+	writeConsumeLog(item)
 }
 
 type RecordTaskBillingLogParams struct {
