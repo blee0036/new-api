@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConvertGeminiRequestMirrorsImageConfigToResponseFormat(t *testing.T) {
+func TestConvertGeminiRequestKeepsImageConfigWithoutResponseFormat(t *testing.T) {
 	request := &dto.GeminiChatRequest{
 		Contents: []dto.GeminiChatContent{
 			{Parts: []dto.GeminiPart{{Text: "draw a cat"}}},
@@ -38,13 +38,10 @@ func TestConvertGeminiRequestMirrorsImageConfigToResponseFormat(t *testing.T) {
 	require.NoError(t, common.Unmarshal(body, &out))
 	generationConfig := requireMap(t, out, "generationConfig")
 	imageConfig := requireMap(t, generationConfig, "imageConfig")
-	responseFormat := requireMap(t, generationConfig, "responseFormat")
-	responseImage := requireMap(t, responseFormat, "image")
 
 	require.Equal(t, "16:9", imageConfig["aspectRatio"])
 	require.Equal(t, "2K", imageConfig["imageSize"])
-	require.Equal(t, "16:9", responseImage["aspectRatio"])
-	require.Equal(t, "2K", responseImage["imageSize"])
+	require.NotContains(t, generationConfig, "responseFormat")
 }
 
 func TestConvertGeminiRequestNormalizesSnakeCaseImageFields(t *testing.T) {
@@ -72,27 +69,27 @@ func TestConvertGeminiRequestNormalizesSnakeCaseImageFields(t *testing.T) {
 	require.Equal(t, "4:3", imageConfig["aspectRatio"])
 	require.Equal(t, "4K", imageConfig["imageSize"])
 
-	responseImage := responseFormatImage(t, request.GenerationConfig.ResponseFormat)
-	require.Equal(t, "4:3", responseImage["aspectRatio"])
-	require.Equal(t, "4K", responseImage["imageSize"])
+	require.Empty(t, request.GenerationConfig.ResponseFormat)
 }
 
-func TestImageConfigCompatibilityPreservesExplicitResponseFormat(t *testing.T) {
+func TestImageConfigCompatibilityNormalizesExplicitResponseFormatEnums(t *testing.T) {
 	request := &dto.GeminiChatRequest{
 		GenerationConfig: dto.GeminiChatGenerationConfig{
 			ImageConfig:    []byte(`{"aspectRatio":"16:9","imageSize":"2K"}`),
-			ResponseFormat: []byte(`{"image":{"aspectRatio":"1:1"}}`),
+			ResponseFormat: []byte(`{"image":{"aspect_ratio":"1:1","image_size":"1K"}}`),
 		},
 	}
 
 	require.NoError(t, ApplyImageConfigResponseFormatCompatibility(request, "gemini-3.1-flash-image-preview"))
 
 	responseImage := responseFormatImage(t, request.GenerationConfig.ResponseFormat)
-	require.Equal(t, "1:1", responseImage["aspectRatio"])
-	require.Equal(t, "2K", responseImage["imageSize"])
+	require.NotContains(t, responseImage, "aspect_ratio")
+	require.NotContains(t, responseImage, "image_size")
+	require.Equal(t, "ASPECT_RATIO_ONE_BY_ONE", responseImage["aspectRatio"])
+	require.Equal(t, "IMAGE_SIZE_ONE_K", responseImage["imageSize"])
 }
 
-func TestCovertOpenAI2GeminiMirrorsGoogleImageConfigExtraBody(t *testing.T) {
+func TestCovertOpenAI2GeminiKeepsGoogleImageConfigInImageConfig(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
@@ -114,9 +111,11 @@ func TestCovertOpenAI2GeminiMirrorsGoogleImageConfigExtraBody(t *testing.T) {
 	geminiRequest, err := CovertOpenAI2Gemini(c, request, info)
 	require.NoError(t, err)
 
-	responseImage := responseFormatImage(t, geminiRequest.GenerationConfig.ResponseFormat)
-	require.Equal(t, "21:9", responseImage["aspectRatio"])
-	require.Equal(t, "4K", responseImage["imageSize"])
+	var imageConfig map[string]interface{}
+	require.NoError(t, common.Unmarshal(geminiRequest.GenerationConfig.ImageConfig, &imageConfig))
+	require.Equal(t, "21:9", imageConfig["aspectRatio"])
+	require.Equal(t, "4K", imageConfig["imageSize"])
+	require.Empty(t, geminiRequest.GenerationConfig.ResponseFormat)
 }
 
 func responseFormatImage(t *testing.T, raw []byte) map[string]interface{} {

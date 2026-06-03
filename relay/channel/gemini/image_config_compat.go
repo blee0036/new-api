@@ -8,10 +8,10 @@ import (
 	"github.com/QuantumNous/new-api/setting/model_setting"
 )
 
-// ApplyImageConfigResponseFormatCompatibility mirrors Gemini imageConfig into
-// responseFormat.image for Gemini image models. Recent Gemini image REST
-// examples use responseFormat.image, while older clients and docs still send
-// imageConfig.
+// ApplyImageConfigResponseFormatCompatibility normalizes Gemini image config
+// fields. generationConfig.imageConfig accepts string values like "1:1" and
+// "1K"; generationConfig.responseFormat.image uses proto enum names for the
+// same concepts, so it must only be normalized when explicitly present.
 func ApplyImageConfigResponseFormatCompatibility(request *dto.GeminiChatRequest, modelName string) error {
 	if request == nil || !isGeminiImageConfigModel(modelName) {
 		return nil
@@ -50,36 +50,13 @@ func normalizeGenerationConfigImageFields(config *dto.GeminiChatGenerationConfig
 
 	changedImageConfig := false
 	if hasImageConfig {
-		changedImageConfig = normalizeGeminiImageFields(imageConfig)
+		changedImageConfig = normalizeGeminiImageConfigFields(imageConfig)
 	}
 
 	changedResponseFormat := false
 	if hasResponseFormat {
 		if image, ok := responseFormat["image"].(map[string]interface{}); ok {
-			changedResponseFormat = normalizeGeminiImageFields(image)
-		}
-	}
-
-	if hasImageConfig && hasGeminiImageOutputFields(imageConfig) {
-		if responseFormat == nil {
-			responseFormat = make(map[string]interface{})
-		}
-
-		image, ok := responseFormat["image"].(map[string]interface{})
-		if !ok {
-			if responseFormat["image"] != nil {
-				return marshalNormalizedImageConfig(config, imageConfig, changedImageConfig, responseFormat, changedResponseFormat)
-			}
-			image = make(map[string]interface{})
-			responseFormat["image"] = image
-			changedResponseFormat = true
-		}
-
-		if copyMissingImageField(image, imageConfig, "aspectRatio") {
-			changedResponseFormat = true
-		}
-		if copyMissingImageField(image, imageConfig, "imageSize") {
-			changedResponseFormat = true
+			changedResponseFormat = normalizeGeminiImageResponseFormatFields(image)
 		}
 	}
 
@@ -124,7 +101,7 @@ func rawJSONObject(raw []byte) (map[string]interface{}, bool, error) {
 	return out, true, nil
 }
 
-func normalizeGeminiImageFields(image map[string]interface{}) bool {
+func normalizeGeminiImageConfigFields(image map[string]interface{}) bool {
 	changed := false
 	if value, ok := image["aspect_ratio"]; ok {
 		if _, exists := image["aspectRatio"]; !exists {
@@ -143,25 +120,69 @@ func normalizeGeminiImageFields(image map[string]interface{}) bool {
 	return changed
 }
 
-func hasGeminiImageOutputFields(image map[string]interface{}) bool {
-	_, hasAspectRatio := image["aspectRatio"]
-	_, hasImageSize := image["imageSize"]
-	return hasAspectRatio || hasImageSize
+func normalizeGeminiImageResponseFormatFields(image map[string]interface{}) bool {
+	changed := normalizeGeminiImageConfigFields(image)
+	if normalizeImageResponseEnumField(image, "aspectRatio", geminiImageResponseAspectRatioEnums) {
+		changed = true
+	}
+	if normalizeImageResponseEnumField(image, "imageSize", geminiImageResponseSizeEnums) {
+		changed = true
+	}
+	return changed
 }
 
-func copyMissingImageField(target, source map[string]interface{}, camelKey string, sourceKeys ...string) bool {
-	if _, exists := target[camelKey]; exists {
+func normalizeImageResponseEnumField(image map[string]interface{}, key string, enumMap map[string]string) bool {
+	value, ok := image[key].(string)
+	if !ok {
 		return false
 	}
-
-	keys := append([]string{camelKey}, sourceKeys...)
-	for _, key := range keys {
-		value, ok := source[key]
-		if !ok {
-			continue
-		}
-		target[camelKey] = value
-		return true
+	enumValue, ok := enumMap[strings.ToUpper(strings.TrimSpace(value))]
+	if !ok || enumValue == value {
+		return false
 	}
-	return false
+	image[key] = enumValue
+	return true
+}
+
+var geminiImageResponseAspectRatioEnums = map[string]string{
+	"1:1":                             "ASPECT_RATIO_ONE_BY_ONE",
+	"2:3":                             "ASPECT_RATIO_TWO_BY_THREE",
+	"3:2":                             "ASPECT_RATIO_THREE_BY_TWO",
+	"3:4":                             "ASPECT_RATIO_THREE_BY_FOUR",
+	"4:3":                             "ASPECT_RATIO_FOUR_BY_THREE",
+	"4:5":                             "ASPECT_RATIO_FOUR_BY_FIVE",
+	"5:4":                             "ASPECT_RATIO_FIVE_BY_FOUR",
+	"9:16":                            "ASPECT_RATIO_NINE_BY_SIXTEEN",
+	"16:9":                            "ASPECT_RATIO_SIXTEEN_BY_NINE",
+	"21:9":                            "ASPECT_RATIO_TWENTY_ONE_BY_NINE",
+	"1:8":                             "ASPECT_RATIO_ONE_BY_EIGHT",
+	"8:1":                             "ASPECT_RATIO_EIGHT_BY_ONE",
+	"1:4":                             "ASPECT_RATIO_ONE_BY_FOUR",
+	"4:1":                             "ASPECT_RATIO_FOUR_BY_ONE",
+	"ASPECT_RATIO_ONE_BY_ONE":         "ASPECT_RATIO_ONE_BY_ONE",
+	"ASPECT_RATIO_TWO_BY_THREE":       "ASPECT_RATIO_TWO_BY_THREE",
+	"ASPECT_RATIO_THREE_BY_TWO":       "ASPECT_RATIO_THREE_BY_TWO",
+	"ASPECT_RATIO_THREE_BY_FOUR":      "ASPECT_RATIO_THREE_BY_FOUR",
+	"ASPECT_RATIO_FOUR_BY_THREE":      "ASPECT_RATIO_FOUR_BY_THREE",
+	"ASPECT_RATIO_FOUR_BY_FIVE":       "ASPECT_RATIO_FOUR_BY_FIVE",
+	"ASPECT_RATIO_FIVE_BY_FOUR":       "ASPECT_RATIO_FIVE_BY_FOUR",
+	"ASPECT_RATIO_NINE_BY_SIXTEEN":    "ASPECT_RATIO_NINE_BY_SIXTEEN",
+	"ASPECT_RATIO_SIXTEEN_BY_NINE":    "ASPECT_RATIO_SIXTEEN_BY_NINE",
+	"ASPECT_RATIO_TWENTY_ONE_BY_NINE": "ASPECT_RATIO_TWENTY_ONE_BY_NINE",
+	"ASPECT_RATIO_ONE_BY_EIGHT":       "ASPECT_RATIO_ONE_BY_EIGHT",
+	"ASPECT_RATIO_EIGHT_BY_ONE":       "ASPECT_RATIO_EIGHT_BY_ONE",
+	"ASPECT_RATIO_ONE_BY_FOUR":        "ASPECT_RATIO_ONE_BY_FOUR",
+	"ASPECT_RATIO_FOUR_BY_ONE":        "ASPECT_RATIO_FOUR_BY_ONE",
+}
+
+var geminiImageResponseSizeEnums = map[string]string{
+	"512":                    "IMAGE_SIZE_FIVE_TWELVE",
+	"1K":                     "IMAGE_SIZE_ONE_K",
+	"2K":                     "IMAGE_SIZE_TWO_K",
+	"4K":                     "IMAGE_SIZE_FOUR_K",
+	"IMAGE_SIZE_FIVE_TWELVE": "IMAGE_SIZE_FIVE_TWELVE",
+	"IMAGE_SIZE_ONE_K":       "IMAGE_SIZE_ONE_K",
+	"IMAGE_SIZE_TWO_K":       "IMAGE_SIZE_TWO_K",
+	"IMAGE_SIZE_FOUR_K":      "IMAGE_SIZE_FOUR_K",
+	"IMAGE_SIZE_UNSPECIFIED": "IMAGE_SIZE_UNSPECIFIED",
 }
