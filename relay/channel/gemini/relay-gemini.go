@@ -677,6 +677,10 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		}
 	}
 
+	if err := ApplyImageConfigResponseFormatCompatibility(&geminiRequest, info.UpstreamModelName); err != nil {
+		return nil, err
+	}
+
 	return &geminiRequest, nil
 }
 

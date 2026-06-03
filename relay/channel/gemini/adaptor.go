@@ -40,6 +40,13 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 			}
 		}
 	}
+	modelName := ""
+	if info != nil && info.ChannelMeta != nil {
+		modelName = info.UpstreamModelName
+	}
+	if err := ApplyImageConfigResponseFormatCompatibility(request, modelName); err != nil {
+		return nil, err
+	}
 	return request, nil
 }
 
