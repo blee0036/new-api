@@ -15,7 +15,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
 
@@ -458,18 +457,16 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		if nodeName == "" {
 			nodeName = common.NodeName
 		}
-		gopool.Go(func() {
-			LogQuotaData(QuotaDataLogParams{
-				UserID:    params.UserId,
-				Username:  username,
-				ModelName: params.ModelName,
-				Quota:     params.Quota,
-				CreatedAt: createdAt,
-				UseGroup:  params.Group,
-				TokenID:   params.TokenId,
-				ChannelID: params.ChannelId,
-				NodeName:  nodeName,
-			})
+		LogQuotaData(QuotaDataLogParams{
+			UserID:    params.UserId,
+			Username:  username,
+			ModelName: params.ModelName,
+			Quota:     params.Quota,
+			CreatedAt: createdAt,
+			UseGroup:  params.Group,
+			TokenID:   params.TokenId,
+			ChannelID: params.ChannelId,
+			NodeName:  nodeName,
 		})
 	}
 }
