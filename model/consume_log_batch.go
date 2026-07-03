@@ -16,12 +16,16 @@ type consumeLogBatchItem struct {
 }
 
 type consumeLogDataExport struct {
-	userId    int
+	userID    int
 	username  string
 	modelName string
 	quota     int
 	createdAt int64
 	tokenUsed int
+	useGroup  string
+	tokenID   int
+	channelID int
+	nodeName  string
 }
 
 var (
@@ -97,6 +101,7 @@ func writeConsumeLogBatch(items []consumeLogBatchItem) {
 	logs := make([]*Log, 0, len(items))
 	for _, item := range items {
 		if item.log != nil {
+			ensureLogRequestId(item.log)
 			logs = append(logs, item.log)
 		}
 	}
@@ -122,6 +127,7 @@ func writeConsumeLog(item consumeLogBatchItem) {
 	if item.log == nil {
 		return
 	}
+	ensureLogRequestId(item.log)
 	if err := LOG_DB.Create(item.log).Error; err != nil {
 		common.SysLog("failed to record consume log: " + err.Error())
 	}
@@ -132,5 +138,16 @@ func recordConsumeLogDataExport(data *consumeLogDataExport) {
 	if data == nil || !common.DataExportEnabled {
 		return
 	}
-	LogQuotaData(data.userId, data.username, data.modelName, data.quota, data.createdAt, data.tokenUsed)
+	LogQuotaData(QuotaDataLogParams{
+		UserID:    data.userID,
+		Username:  data.username,
+		ModelName: data.modelName,
+		Quota:     data.quota,
+		CreatedAt: data.createdAt,
+		TokenUsed: data.tokenUsed,
+		UseGroup:  data.useGroup,
+		TokenID:   data.tokenID,
+		ChannelID: data.channelID,
+		NodeName:  data.nodeName,
+	})
 }
