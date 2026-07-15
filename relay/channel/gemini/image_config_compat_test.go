@@ -1,15 +1,12 @@
 package gemini
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/gin-gonic/gin"
+	"github.com/QuantumNous/new-api/service/relayconvert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,14 +86,9 @@ func TestImageConfigCompatibilityNormalizesExplicitResponseFormatEnums(t *testin
 	require.Equal(t, "IMAGE_SIZE_ONE_K", responseImage["imageSize"])
 }
 
-func TestCovertOpenAI2GeminiKeepsGoogleImageConfigInImageConfig(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-
+func TestOpenAIChatRequestToGeminiKeepsGoogleImageConfigInImageConfig(t *testing.T) {
 	info := &relaycommon.RelayInfo{
 		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType:       constant.ChannelTypeGemini,
 			UpstreamModelName: "gemini-3.1-flash-image-preview",
 		},
 	}
@@ -108,7 +100,7 @@ func TestCovertOpenAI2GeminiKeepsGoogleImageConfigInImageConfig(t *testing.T) {
 		ExtraBody: []byte(`{"google":{"image_config":{"aspect_ratio":"21:9","image_size":"4K"}}}`),
 	}
 
-	geminiRequest, err := CovertOpenAI2Gemini(c, request, info)
+	geminiRequest, err := relayconvert.OpenAIChatRequestToGeminiGenerateContent(nil, request, info)
 	require.NoError(t, err)
 
 	var imageConfig map[string]interface{}
