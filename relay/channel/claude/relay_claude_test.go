@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/service/relayconvert"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/relayconvert"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestResponseOpenAI2ClaudeToolUseInputIsObject(t *testing.T) {
 					},
 				},
 			})
-			resp := relayconvert.ResponseOpenAI2Claude(&dto.OpenAITextResponse{
+			resp := service.ResponseOpenAI2Claude(&dto.OpenAITextResponse{
 				Id:    "chatcmpl_1",
 				Model: "gpt-test",
 				Choices: []dto.OpenAITextResponseChoice{
@@ -266,11 +267,12 @@ func TestOpenAIChatRequestToClaudeMessagesMapsResponseFormat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := dto.GeneralOpenAIRequest{
 				Model:          "claude-opus-4-6-low",
+				MaxTokens:      commonPointer(uint(1024)),
 				Messages:       []dto.Message{{Role: "user", Content: "translate this"}},
 				ResponseFormat: tt.responseFormat,
 			}
 
-			claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, request)
+			claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, nil, request)
 			require.NoError(t, err)
 
 			var outputConfig map[string]any
@@ -428,7 +430,8 @@ func TestOpenAIChatRequestToClaudeMessagesHandlesFileContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := dto.GeneralOpenAIRequest{
-				Model: "claude-3-5-sonnet",
+				Model:     "claude-3-5-sonnet",
+				MaxTokens: commonPointer(uint(1024)),
 				Messages: []dto.Message{{
 					Role: "user",
 					Content: []any{
@@ -438,7 +441,7 @@ func TestOpenAIChatRequestToClaudeMessagesHandlesFileContent(t *testing.T) {
 				}},
 			}
 
-			claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, request)
+			claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, nil, request)
 			require.NoError(t, err)
 			require.Len(t, claudeRequest.Messages, 1)
 			content, ok := claudeRequest.Messages[0].Content.([]dto.ClaudeMediaMessage)
@@ -457,7 +460,7 @@ func TestOpenAIChatRequestToClaudeMessagesKeepsConfiguredModelSuffix(t *testing.
 		ChannelOtherSettings: dto.ChannelOtherSettings{KeepThinkingModelSuffix: true},
 	}}
 
-	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, request, info)
+	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, info, request)
 	require.NoError(t, err)
 	assert.Equal(t, "claude-opus-4-8-high", claudeRequest.Model)
 }
@@ -476,7 +479,7 @@ func TestOpenAIChatRequestToClaudeMessages_ClaudeOpus48HighUsesAdaptiveThinking(
 		},
 	}
 
-	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, request)
+	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, &relaycommon.RelayInfo{}, request)
 	require.NoError(t, err)
 	require.Equal(t, "claude-opus-4-8", claudeRequest.Model)
 	require.NotNil(t, claudeRequest.Thinking)
@@ -502,7 +505,7 @@ func TestOpenAIChatRequestToClaudeMessages_ClaudeOpus48ThinkingUsesAdaptiveHighE
 		},
 	}
 
-	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, request)
+	claudeRequest, err := relayconvert.OpenAIChatRequestToClaudeMessages(nil, &relaycommon.RelayInfo{}, request)
 	require.NoError(t, err)
 	require.Equal(t, "claude-opus-4-8", claudeRequest.Model)
 	require.NotNil(t, claudeRequest.Thinking)

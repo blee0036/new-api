@@ -9,8 +9,8 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -127,7 +127,6 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			delete(otherMap, "is_model_mapped")
 			// Remove operation-audit details (operator/route info), admin-only.
 			delete(otherMap, "audit_info")
-			delete(otherMap, "stream_status")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 	}
