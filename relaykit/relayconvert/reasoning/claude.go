@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 )
 
 type ClaudeRender struct {
@@ -14,6 +15,10 @@ type ClaudeRender struct {
 	EffectiveEffort           Effort
 	ClearSampling             bool
 	ConstrainThinkingSampling bool
+	// MaxTokens is set when manual thinking needed a larger max_tokens than
+	// the request carried; callers apply it to the outgoing request.
+	MaxTokens   *uint
+	Diagnostics []types.ConversionDiagnostic
 }
 
 type claudeCapabilities struct {
@@ -73,20 +78,31 @@ func claudeCapabilitiesFor(model string) claudeCapabilities {
 }
 
 func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPercentage float64) (ClaudeRender, error) {
-	if intent.Mode == ModeDisabled && intent.Effort != "" && intent.Effort != EffortNone {
+	disabledWithEffort := intent.Mode == ModeDisabled && intent.Effort != "" && intent.Effort != EffortNone
+	if disabledWithEffort {
 		effort, err := ParseEffort(string(intent.Effort))
 		if err != nil {
 			return ClaudeRender{}, err
 		}
 		intent.Effort = effort
-	} else {
+	}
+	diagnostics := make([]types.ConversionDiagnostic, 0, 1)
+	if !disabledWithEffort {
+		var normalizeDiagnostics []types.ConversionDiagnostic
 		var err error
-		intent, err = normalizeIntent(intent)
+		intent, normalizeDiagnostics, err = normalizeIntent(intent)
 		if err != nil {
 			return ClaudeRender{}, err
 		}
+		diagnostics = append(diagnostics, normalizeDiagnostics...)
 	}
 	capabilities := claudeCapabilitiesFor(model)
+	if disabledWithEffort {
+		diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+			"claude_disabled_effort_ignored",
+			fmt.Sprintf("model %q cannot apply effort %q while thinking is disabled; the effort was ignored", model, intent.Effort),
+		))
+	}
 	if !intent.HasStrength() {
 		if intent.IncludeThoughts != nil && capabilities.adaptive && capabilities.defaultThinking {
 			thinking := &dto.Thinking{Type: "adaptive"}
@@ -108,23 +124,50 @@ func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPer
 	}
 
 	if intent.Mode == ModeDisabled || intent.Effort == EffortNone {
-		if strings.HasPrefix(strings.ToLower(model), "claude-opus-5") &&
-			(intent.Effort == EffortXHigh || intent.Effort == EffortMax) {
-			return ClaudeRender{}, fmt.Errorf("model %q does not support effort %q while thinking is disabled", model, intent.Effort)
-		}
 		if !capabilities.supportsDisable {
-			return ClaudeRender{}, fmt.Errorf("%w for model %q", ErrThinkingNotDisabled, model)
+			diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+				"claude_thinking_disable_unsupported",
+				fmt.Sprintf("model %q cannot disable thinking; using the lowest representable thinking mode", model),
+			))
+			if capabilities.adaptive {
+				thinking := &dto.Thinking{Type: "adaptive"}
+				if intent.IncludeThoughts != nil {
+					if *intent.IncludeThoughts {
+						thinking.Display = "summarized"
+					} else {
+						thinking.Display = "omitted"
+					}
+				}
+				outputEffort := Effort("")
+				effectiveEffort := EffortHigh
+				if capabilities.supportsEffort {
+					outputEffort = EffortLow
+					effectiveEffort = EffortLow
+				}
+				return ClaudeRender{
+					Thinking:        thinking,
+					OutputEffort:    outputEffort,
+					EffectiveEffort: effectiveEffort,
+					ClearSampling:   capabilities.strictSampling,
+					Diagnostics:     diagnostics,
+				}, nil
+			}
+			return ClaudeRender{Diagnostics: diagnostics}, nil
 		}
 		return ClaudeRender{
 			Thinking:        &dto.Thinking{Type: "disabled"},
 			EffectiveEffort: EffortNone,
 			ClearSampling:   capabilities.strictSampling,
+			Diagnostics:     diagnostics,
 		}, nil
 	}
 
 	preferManual := capabilities.supportsManual && intent.BudgetTokens != nil && intent.Mode != ModeAdaptive
-	if !capabilities.supportsManual && intent.BudgetTokens != nil && intent.BudgetSource == SourceNative && intent.Mode == ModeEnabled {
-		return ClaudeRender{}, fmt.Errorf("model %q requires adaptive thinking and does not support native budget_tokens", model)
+	if !capabilities.supportsManual && intent.BudgetTokens != nil && intent.Mode == ModeEnabled {
+		diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+			"claude_budget_to_adaptive",
+			fmt.Sprintf("model %q uses adaptive thinking; budget_tokens was converted to an effort level", model),
+		))
 	}
 	if capabilities.adaptive && !preferManual {
 		effort := intent.Effort
@@ -134,7 +177,14 @@ func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPer
 		if effort == "" && intent.Mode == ModeEnabled {
 			effort = EffortHigh
 		}
-		effort = normalizeClaudeEffort(effort, capabilities)
+		normalizedEffort := normalizeClaudeEffort(effort, capabilities)
+		if effort != "" && normalizedEffort != effort {
+			diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+				"claude_effort_adjusted",
+				fmt.Sprintf("model %q does not support effort %q; using %q", model, effort, normalizedEffort),
+			))
+		}
+		effort = normalizedEffort
 		effectiveEffort := effort
 		if effectiveEffort == "" && intent.Mode == ModeAdaptive {
 			effectiveEffort = EffortHigh
@@ -148,6 +198,7 @@ func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPer
 				OutputEffort:    effort,
 				EffectiveEffort: effectiveEffort,
 				ClearSampling:   capabilities.strictSampling,
+				Diagnostics:     diagnostics,
 			}, nil
 		}
 
@@ -165,48 +216,68 @@ func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPer
 			EffectiveEffort:           effectiveEffort,
 			ClearSampling:             capabilities.strictSampling,
 			ConstrainThinkingSampling: !capabilities.strictSampling,
+			Diagnostics:               diagnostics,
 		}, nil
 	}
 
 	if intent.Mode == ModeAdaptive {
-		return ClaudeRender{}, fmt.Errorf("model %q does not support adaptive thinking", model)
+		diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+			"claude_adaptive_to_manual",
+			fmt.Sprintf("model %q does not support adaptive thinking; using manual thinking", model),
+		))
+		intent.Mode = ModeEnabled
+		if intent.Effort == "" {
+			intent.Effort = EffortHigh
+		}
 	}
 	if intent.Mode == ModeUnset {
-		return ClaudeRender{OutputEffort: intent.Effort, EffectiveEffort: intent.Effort}, nil
+		return ClaudeRender{OutputEffort: intent.Effort, EffectiveEffort: intent.Effort, Diagnostics: diagnostics}, nil
 	}
-	if maxTokens == nil {
-		return ClaudeRender{}, fmt.Errorf("max_tokens is required for manual Claude thinking")
-	}
-	if *maxTokens <= 1024 {
-		return ClaudeRender{}, fmt.Errorf("max_tokens must be greater than 1024 for manual Claude thinking")
+	var raisedMaxTokens *uint
+	if maxTokens == nil || *maxTokens <= 1024 {
+		// Manual thinking needs room above the 1024-token minimum budget.
+		// Raising max_tokens keeps the request usable instead of rejecting it.
+		raised := uint(1280)
+		if intent.BudgetTokens != nil && *intent.BudgetTokens >= 0 && *intent.BudgetTokens < math.MaxInt32/2 {
+			raised = max(raised, uint(*intent.BudgetTokens)+1)
+		}
+		current := "a missing max_tokens"
+		if maxTokens != nil {
+			current = fmt.Sprintf("max_tokens %d", *maxTokens)
+		}
+		diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+			"claude_max_tokens_raised",
+			fmt.Sprintf("model %q requires max_tokens greater than 1024 for manual thinking; raised %s to %d", model, current, raised),
+		))
+		raisedMaxTokens = &raised
+		maxTokens = &raised
 	}
 	if uint64(*maxTokens) > uint64(math.MaxInt) {
 		return ClaudeRender{}, fmt.Errorf("max_tokens is too large for a thinking budget")
 	}
 
 	budget := 0
-	if intent.BudgetTokens != nil && *intent.BudgetTokens == -1 && intent.BudgetSource == SourceNative {
-		return ClaudeRender{}, fmt.Errorf("Claude thinking budget_tokens does not support -1")
-	}
 	if intent.BudgetTokens != nil && *intent.BudgetTokens >= 0 {
-		budget = *intent.BudgetTokens
-		if intent.BudgetSource != SourceNative {
-			if budget < 1024 {
-				budget = 1024
-			}
-			if uint(budget) >= *maxTokens {
-				budget = int(*maxTokens) - 1
-			}
+		requestedBudget := *intent.BudgetTokens
+		budget = max(requestedBudget, 1024)
+		if uint(budget) >= *maxTokens {
+			budget = int(*maxTokens) - 1
 		}
-		if budget < 1024 || uint(budget) >= *maxTokens {
-			return ClaudeRender{}, fmt.Errorf("Claude thinking budget must satisfy 1024 <= budget_tokens < max_tokens")
+		if budget != requestedBudget {
+			diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+				"claude_budget_adjusted",
+				fmt.Sprintf("model %q requires 1024 <= budget_tokens < max_tokens; adjusted %d to %d", model, requestedBudget, budget),
+			))
 		}
 	} else {
-		percentage := effortPercentage(intent.Effort, adapterBudgetPercentage)
-		budget = int(*maxTokens) * percentage / 100
-		if budget < 1024 {
-			budget = 1024
+		if intent.BudgetTokens != nil {
+			diagnostics = append(diagnostics, claudeReasoningDiagnostic(
+				"claude_dynamic_budget_converted",
+				fmt.Sprintf("model %q does not support a dynamic budget; derived a manual budget from reasoning effort", model),
+			))
 		}
+		percentage := effortPercentage(intent.Effort, adapterBudgetPercentage)
+		budget = max(int(*maxTokens)*percentage/100, 1024)
 		if uint(budget) >= *maxTokens {
 			budget = int(*maxTokens) - 1
 		}
@@ -236,7 +307,19 @@ func RenderClaude(model string, intent Intent, maxTokens *uint, adapterBudgetPer
 		OutputEffort:              outputEffort,
 		EffectiveEffort:           effectiveEffort,
 		ConstrainThinkingSampling: true,
+		MaxTokens:                 raisedMaxTokens,
+		Diagnostics:               diagnostics,
 	}, nil
+}
+
+func claudeReasoningDiagnostic(code string, message string) types.ConversionDiagnostic {
+	return types.ConversionDiagnostic{
+		Code:     code,
+		Path:     "thinking",
+		Message:  message,
+		Severity: types.ConversionDiagnosticWarning,
+		To:       types.RelayFormatClaude,
+	}
 }
 
 // ClaudeUsesManualThinking reports whether an exact numeric budget is rendered
