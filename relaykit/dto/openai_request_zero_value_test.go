@@ -198,8 +198,10 @@ func TestGeneralOpenAIRequestGetSystemRoleName(t *testing.T) {
 		{name: "gpt 5.6 uses developer", model: "gpt-5.6-luna", want: "developer"},
 		{name: "gpt 6 uses developer", model: "gpt-6-astra", want: "developer"},
 		{name: "gpt 6 snapshot uses developer", model: "gpt-6-astra-2026-09-03", want: "developer"},
-		{name: "unknown gpt 6 variant stays system", model: "gpt-6-astra-pro", want: "system"},
-		{name: "invalid gpt 6 snapshot stays system", model: "gpt-6-astra-2026-99-03", want: "system"},
+		{name: "gpt 6 luna uses developer", model: "gpt-6-luna", want: "developer"},
+		{name: "gpt 6 effort variant uses developer", model: "gpt-6-luna-minimal", want: "developer"},
+		{name: "gpt 6 variant uses developer", model: "gpt-6-astra-pro", want: "developer"},
+		{name: "invalid gpt 6 snapshot uses developer", model: "gpt-6-astra-2026-99-03", want: "developer"},
 		{name: "unknown generation stays system", model: "gpt-7", want: "system"},
 		{name: "gpt 4.1 stays system", model: "gpt-4.1-nano", want: "system"},
 		{name: "omni is not o series", model: "omni-moderation-latest", want: "system"},
@@ -210,6 +212,42 @@ func TestGeneralOpenAIRequestGetSystemRoleName(t *testing.T) {
 			req := GeneralOpenAIRequest{Model: tt.model}
 
 			assert.Equal(t, tt.want, req.GetSystemRoleName())
+		})
+	}
+}
+
+func TestIsOpenAIGPT6Model(t *testing.T) {
+	tests := []struct {
+		model string
+		want  bool
+	}{
+		{model: "gpt-6", want: true},
+		{model: "gpt-6-luna", want: true},
+		{model: "gpt-6-luna-minimal", want: true},
+		{model: "gpt-6.1", want: true},
+		{model: "gpt-60", want: false},
+		{model: "gpt-6custom", want: false},
+		{model: "gpt-5.6-luna", want: false},
+		{model: "gpt-7", want: false},
+		{model: "gpt-4.1", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsOpenAIGPT6Model(tt.model))
+		})
+	}
+}
+
+func TestGetOpenAIChatCapabilitiesForGPT6Family(t *testing.T) {
+	for _, model := range []string{"gpt-6-luna", "gpt-6-luna-minimal", "gpt-6-astra-pro"} {
+		t.Run(model, func(t *testing.T) {
+			capabilities := GetOpenAIChatCapabilities(model, "minimal")
+			assert.True(t, capabilities.UseMaxCompletionTokens)
+			assert.True(t, capabilities.UseDeveloperRole)
+			assert.False(t, capabilities.SupportsTemperature)
+			assert.False(t, capabilities.SupportsTopP)
+			assert.False(t, capabilities.SupportsLogProbs)
 		})
 	}
 }

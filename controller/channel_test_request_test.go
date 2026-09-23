@@ -135,6 +135,7 @@ func TestOpenAIChatSamplingCompatibility(t *testing.T) {
 		{name: "codex model name keeps max", model: "gpt-5.1-codex-max", wantRole: "developer", wantParams: `{}`},
 		{name: "GPT6", model: "gpt-6-astra", wantRole: "developer", wantParams: `{}`},
 		{name: "GPT6 snapshot", model: "gpt-6-astra-2026-09-03", wantRole: "developer", wantParams: `{}`},
+		{name: "GPT6 Luna effort suffix", model: "gpt-6-luna-minimal", wantModel: "gpt-6-luna", wantEffort: "minimal", wantRole: "developer", wantParams: `{}`},
 		{name: "GPT6 effort suffix", model: "gpt-6-astra-high", wantModel: "gpt-6-astra", wantEffort: "high", wantRole: "developer", wantParams: `{}`},
 		{name: "none effort suffix", model: "gpt-5.2-none", wantModel: "gpt-5.2", wantEffort: "none", wantRole: "developer", wantParams: sampling},
 		{name: "modifier overrides explicit effort", model: "gpt-5.2@thinking:off", effort: "high", wantModel: "gpt-5.2", wantEffort: "none", wantRole: "developer", wantParams: sampling},
@@ -184,6 +185,18 @@ func TestOpenAIChatSamplingCompatibility(t *testing.T) {
 			assert.JSONEq(t, string(wantJSON), string(encoded))
 		})
 	}
+}
+
+func TestAzureGPT6LunaEffortSuffixCompatibility(t *testing.T) {
+	request := &dto.GeneralOpenAIRequest{
+		Model:     "gpt-6-luna-minimal",
+		Messages:  []dto.Message{{Role: "system", Content: "You are helpful."}, {Role: "user", Content: "hi"}},
+		MaxTokens: lo.ToPtr(uint(16)),
+	}
+
+	encoded := convertChatCompatibilityRequest(t, request, constant.ChannelTypeAzure, nil)
+	want := `{"model":"gpt-6-luna","messages":[{"role":"developer","content":"You are helpful."},{"role":"user","content":"hi"}],"max_completion_tokens":16,"reasoning_effort":"minimal"}`
+	assert.JSONEq(t, want, string(encoded))
 }
 
 func TestOpenAIChatTokenLimitCompatibility(t *testing.T) {

@@ -303,6 +303,13 @@ func IsOpenAIGPT5Model(modelName string) bool {
 	return modelName == "gpt-5" || strings.HasPrefix(modelName, "gpt-5-") || strings.HasPrefix(modelName, "gpt-5.")
 }
 
+// IsOpenAIGPT6Model identifies the GPT-6 family independently of request
+// capabilities. GPT-6 variants use the reasoning-capable Chat Completions
+// parameter set, including max_completion_tokens and the developer role.
+func IsOpenAIGPT6Model(modelName string) bool {
+	return modelName == "gpt-6" || strings.HasPrefix(modelName, "gpt-6-") || strings.HasPrefix(modelName, "gpt-6.")
+}
+
 // OpenAIChatCapabilities describes independent Chat Completions compatibility rules.
 type OpenAIChatCapabilities struct {
 	UseMaxCompletionTokens bool
@@ -329,7 +336,7 @@ func GetOpenAIChatCapabilities(modelName, reasoningEffort string) OpenAIChatCapa
 	}
 
 	isGPT5Model := IsOpenAIGPT5Model(modelName)
-	if !isGPT5Model && !isOpenAIModelSnapshot(modelName, "gpt-6-astra") {
+	if !isGPT5Model && !IsOpenAIGPT6Model(modelName) {
 		return capabilities
 	}
 	capabilities.UseMaxCompletionTokens = true
@@ -337,7 +344,7 @@ func GetOpenAIChatCapabilities(modelName, reasoningEffort string) OpenAIChatCapa
 
 	// These standard GPT-5 models default to none and support sampling only
 	// without reasoning. Named variants (pro, codex, chat-latest, etc.) do not
-	// inherit this exception. GPT-6 Astra never supports these parameters.
+	// inherit this exception. GPT-6 variants never support these parameters.
 	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2
 	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.4
 	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra
