@@ -240,14 +240,28 @@ func TestIsOpenAIGPT6Model(t *testing.T) {
 }
 
 func TestGetOpenAIChatCapabilitiesForGPT6Family(t *testing.T) {
-	for _, model := range []string{"gpt-6-luna", "gpt-6-luna-minimal", "gpt-6-astra-pro"} {
-		t.Run(model, func(t *testing.T) {
-			capabilities := GetOpenAIChatCapabilities(model, "minimal")
+	for _, tc := range []struct {
+		model, effort string
+		wantSampling  bool
+	}{
+		{model: "gpt-6-luna", wantSampling: true},
+		{model: "gpt-6-luna", effort: "none", wantSampling: true},
+		{model: "gpt-6-luna-2026-10-16", effort: "none", wantSampling: true},
+		{model: "gpt-6-sol", effort: "none", wantSampling: true},
+		{model: "gpt-6-sol", effort: "high"},
+		{model: "gpt-6-luna", effort: "minimal"},
+		{model: "gpt-6-luna-minimal", effort: "none"},
+		{model: "gpt-6-luna-minimal", effort: "minimal"},
+		{model: "gpt-6-astra", effort: "none"},
+		{model: "gpt-6-astra-pro", effort: "minimal"},
+	} {
+		t.Run(tc.model+"/"+tc.effort, func(t *testing.T) {
+			capabilities := GetOpenAIChatCapabilities(tc.model, tc.effort)
 			assert.True(t, capabilities.UseMaxCompletionTokens)
 			assert.True(t, capabilities.UseDeveloperRole)
-			assert.False(t, capabilities.SupportsTemperature)
-			assert.False(t, capabilities.SupportsTopP)
-			assert.False(t, capabilities.SupportsLogProbs)
+			assert.Equal(t, tc.wantSampling, capabilities.SupportsTemperature)
+			assert.Equal(t, tc.wantSampling, capabilities.SupportsTopP)
+			assert.Equal(t, tc.wantSampling, capabilities.SupportsLogProbs)
 		})
 	}
 }

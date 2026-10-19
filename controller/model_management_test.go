@@ -157,12 +157,12 @@ func TestModelPricingConversionDatabaseMatrix(t *testing.T) {
 				{"claude-3-7-sonnet-20250219", model.PricingValues{"ModelRatio": float64(1.5), "CacheRatio": float64(0.1), "CreateCacheRatio": float64(1.25)}, `tier("base", p * 3 + c * 15 + cr * 0.3 + cc * 3.75 + cc1h * 6)`, ""},
 				{"conversion-image-default", model.PricingValues{"ModelRatio": float64(2), "ImageRatio": float64(1)}, `tier("base", p * 4 + c * 4)`, ""},
 				{"conversion-image-free", model.PricingValues{"ModelRatio": float64(2), "ImageRatio": float64(0)}, `tier("base", p * 4 + c * 4 + cr * 4 + img * 0)`, ""},
-				{"deepseek-chat", model.PricingValues{"ModelRatio": float64(0.135), "CacheRatio": float64(0.25)}, `tier("base", p * 0.27 + c * 0.27 + cr * 0.0675)`, ""},
+				{"deepseek-chat", model.PricingValues{"ModelRatio": float64(0.135), "CacheRatio": float64(0.25)}, `tier("base", p * 0.27 + c * 1.08 + cr * 0.0675)`, ""},
 				{"gpt-4o-custom", model.PricingValues{"ModelRatio": float64(2)}, `tier("base", p * 4 + c * 16)`, ""},
 				{"gemini-2.5-pro-custom", model.PricingValues{"ModelRatio": float64(2)}, `tier("base", p * 4 + c * 32)`, ""},
 				{"vendor/claude-sonnet-4", model.PricingValues{"ModelRatio": float64(2), "CompletionRatio": float64(0)}, `tier("base", p * 4 + c * 0 + cr * 4 + cc * 5 + cc1h * 8)`, ""},
 				{"conversion-custom", model.PricingValues{"ModelRatio": float64(2), "CompletionRatio": float64(3), "CacheRatio": float64(0), "CreateCacheRatio": float64(1.5), "ImageRatio": float64(2)}, `tier("base", p * 4 + c * 12 + cr * 0 + cc * 6 + img * 8)`, ""},
-				{"deepseek-reasoner", model.PricingValues{"ModelRatio": 0.275, "CacheRatio": 0.25}, `tier("base", p * 0.55 + c * 0.55 + cr * 0.1375)`, ""},
+				{"deepseek-reasoner", model.PricingValues{"ModelRatio": 0.275, "CacheRatio": 0.25}, `tier("base", p * 0.55 + c * 2.2 + cr * 0.1375)`, ""},
 				{"gpt-5.6-sol", model.PricingValues{"ModelRatio": float64(2), "CompletionRatio": float64(2)}, `tier("base", p * 4 + c * 8)`, ""},
 				{"gpt-5.5", model.PricingValues{"ModelRatio": float64(2), "CompletionRatio": float64(2)}, `tier("base", p * 4 + c * 8)`, ""},
 				{"gpt-6-astra", model.PricingValues{"ModelRatio": float64(2), "CompletionRatio": float64(2)}, `tier("base", p * 4 + c * 8)`, ""},
@@ -216,7 +216,7 @@ func TestModelPricingConversionDatabaseMatrix(t *testing.T) {
 							tokens := service.BuildTieredTokenParams(&usage, usage.UsageSemantic == "anthropic", billingexpr.UsedVars(response.Data.Expression))
 							cost, _, err := billingexpr.RunExpr(response.Data.Expression, tokens)
 							require.NoError(t, err)
-							assert.Equal(t, 256.5, cost, "cache reads remain billed across both response formats")
+							assert.Equal(t, 337.5, cost, "cache reads remain billed across both response formats")
 						}
 					}
 					after, err := model.GetModelPricingSnapshot([]string{tc.name})
