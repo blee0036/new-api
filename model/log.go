@@ -387,17 +387,26 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 	item := consumeLogBatchItem{log: log}
 	if common.DataExportEnabled {
+		var cacheReadTokens, cacheCreationTokens int
+		if other != nil {
+			cacheReadTokens, _ = other.public["cache_tokens"].(int)
+			// The settlement path already normalizes the cache creation total.
+			// Do not add the 5m/1h breakdown again or infer tokens from prices.
+			cacheCreationTokens, _ = other.public["cache_write_tokens"].(int)
+		}
 		item.dataExport = &consumeLogDataExport{
-			userID:    userId,
-			username:  username,
-			modelName: params.ModelName,
-			quota:     params.Quota,
-			createdAt: createdAt,
-			tokenUsed: params.PromptTokens + params.CompletionTokens,
-			useGroup:  params.Group,
-			tokenID:   params.TokenId,
-			channelID: params.ChannelId,
-			nodeName:  common.NodeName,
+			userID:              userId,
+			username:            username,
+			modelName:           params.ModelName,
+			quota:               params.Quota,
+			createdAt:           createdAt,
+			tokenUsed:           params.PromptTokens + params.CompletionTokens,
+			cacheReadTokens:     int64(cacheReadTokens),
+			cacheCreationTokens: int64(cacheCreationTokens),
+			useGroup:            params.Group,
+			tokenID:             params.TokenId,
+			channelID:           params.ChannelId,
+			nodeName:            common.NodeName,
 		}
 	}
 	if enqueueConsumeLog(item) {

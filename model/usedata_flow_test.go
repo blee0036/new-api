@@ -1,9 +1,14 @@
 package model
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -190,4 +195,75 @@ func TestLogQuotaDataSplitsRowsByUseGroupTokenChannelAndNode(t *testing.T) {
 	require.Equal(t, 60, rows[0].TokenUsed)
 	require.Equal(t, "default", rows[1].UseGroup)
 	require.Equal(t, 25, rows[1].Quota)
+}
+
+func TestRecordConsumeLogPreservesCacheUsageAcrossWriteModes(t *testing.T) {
+	for _, mode := range []string{"immediate", "batched", "full queue"} {
+		t.Run(mode, func(t *testing.T) {
+			truncateTables(t)
+			previousQueue := consumeLogQueue
+			previousExport, previousConsume, previousNode := common.DataExportEnabled, common.LogConsumeEnabled, common.NodeName
+			CacheQuotaDataLock.Lock()
+			previousCache := CacheQuotaData
+			CacheQuotaData = make(map[string]*QuotaData)
+			CacheQuotaDataLock.Unlock()
+			t.Cleanup(func() {
+				consumeLogQueue = previousQueue
+				common.DataExportEnabled, common.LogConsumeEnabled, common.NodeName = previousExport, previousConsume, previousNode
+				CacheQuotaDataLock.Lock()
+				CacheQuotaData = previousCache
+				CacheQuotaDataLock.Unlock()
+			})
+			common.DataExportEnabled, common.LogConsumeEnabled, common.NodeName = true, true, "node-cache"
+			consumeLogQueue = nil
+			switch mode {
+			case "batched":
+				consumeLogQueue = make(chan consumeLogBatchItem, 1)
+			case "full queue":
+				consumeLogQueue = make(chan consumeLogBatchItem)
+			}
+
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Set("username", "alice")
+			common.SetContextKey(ctx, constant.ContextKeyUserSetting, dto.UserSetting{})
+			other := NewLogOther()
+			other.MergePublic(map[string]any{
+				"cache_tokens":             30,
+				"cache_write_tokens":       70,
+				"cache_creation_tokens":    999,
+				"cache_creation_tokens_5m": 20,
+				"cache_creation_tokens_1h": 50,
+			})
+			RecordConsumeLog(ctx, 7, RecordConsumeLogParams{
+				ModelName: "cache-model", PromptTokens: 200, CompletionTokens: 10,
+				Quota: 100, Group: "vip", TokenId: 11, ChannelId: 2, Other: other,
+			})
+			if mode == "batched" {
+				require.Len(t, consumeLogQueue, 1)
+				writeConsumeLogBatch([]consumeLogBatchItem{<-consumeLogQueue})
+			}
+			SaveQuotaDataCache()
+
+			var logs []Log
+			require.NoError(t, LOG_DB.Find(&logs).Error)
+			require.Len(t, logs, 1)
+			assert.Equal(t, 100, logs[0].Quota)
+			var rows []QuotaData
+			require.NoError(t, DB.Find(&rows).Error)
+			require.Len(t, rows, 1)
+			row := rows[0]
+			assert.Equal(t, 1, row.Count)
+			assert.Equal(t, 100, row.Quota)
+			assert.Equal(t, 210, row.TokenUsed)
+			assert.Equal(t, int64(30), row.CacheReadTokens)
+			assert.Equal(t, int64(70), row.CacheCreationTokens)
+			assert.Equal(t, 7, row.UserID)
+			assert.Equal(t, "alice", row.Username)
+			assert.Equal(t, "cache-model", row.ModelName)
+			assert.Equal(t, "vip", row.UseGroup)
+			assert.Equal(t, 11, row.TokenID)
+			assert.Equal(t, 2, row.ChannelID)
+			assert.Equal(t, "node-cache", row.NodeName)
+		})
+	}
 }

@@ -16,16 +16,18 @@ type consumeLogBatchItem struct {
 }
 
 type consumeLogDataExport struct {
-	userID    int
-	username  string
-	modelName string
-	quota     int
-	createdAt int64
-	tokenUsed int
-	useGroup  string
-	tokenID   int
-	channelID int
-	nodeName  string
+	userID              int
+	username            string
+	modelName           string
+	quota               int
+	createdAt           int64
+	tokenUsed           int
+	cacheReadTokens     int64
+	cacheCreationTokens int64
+	useGroup            string
+	tokenID             int
+	channelID           int
+	nodeName            string
 }
 
 var (
@@ -139,15 +141,17 @@ func recordConsumeLogDataExport(data *consumeLogDataExport) {
 		return
 	}
 	LogQuotaData(QuotaDataLogParams{
-		UserID:    data.userID,
-		Username:  data.username,
-		ModelName: data.modelName,
-		Quota:     data.quota,
-		CreatedAt: data.createdAt,
-		TokenUsed: data.tokenUsed,
-		UseGroup:  data.useGroup,
-		TokenID:   data.tokenID,
-		ChannelID: data.channelID,
-		NodeName:  data.nodeName,
+		UserID:              data.userID,
+		Username:            data.username,
+		ModelName:           data.modelName,
+		Quota:               data.quota,
+		CreatedAt:           data.createdAt,
+		TokenUsed:           data.tokenUsed,
+		CacheReadTokens:     data.cacheReadTokens,
+		CacheCreationTokens: data.cacheCreationTokens,
+		UseGroup:            data.useGroup,
+		TokenID:             data.tokenID,
+		ChannelID:           data.channelID,
+		NodeName:            data.nodeName,
 	})
 }
